@@ -1,9 +1,0 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useGameStore } from "../state/gameStore";
-export function VictoryScreen() {
-    const trophies = useGameStore((s) => s.trophies);
-    const lives = useGameStore((s) => s.lives);
-    const start = useGameStore((s) => s.startNewRun);
-    const exit = useGameStore((s) => s.exitToTitle);
-    return (_jsx("div", { className: "min-h-[80vh] flex items-center justify-center px-4", children: _jsxs("div", { className: "kcard max-w-md w-full text-center space-y-5 p-8", children: [_jsx("div", { className: "flex justify-center gap-3", children: ["/sprites/kawaii_bear.gif", "/sprites/kawaii_panda.gif", "/sprites/kawaii_skip.gif"].map((src, i) => (_jsx("div", { className: "animate-bobby", style: { animationDelay: `${i * 0.2}s` }, children: _jsx("img", { src: src, alt: "", width: 68, style: { imageRendering: "pixelated" } }) }, src))) }), _jsx("div", { className: "chip bg-mint/20 text-mintDark mx-auto", children: "\uD83C\uDF89 victory \uD83C\uDF89" }), _jsx("h2", { className: "text-3xl font-display font-bold text-ink", children: "You survived the market!" }), _jsxs("div", { className: "text-ink/70 text-sm leading-relaxed font-semibold", children: ["Finished with ", _jsxs("span", { className: "font-display font-bold text-bubble", children: [lives, " \uD83D\uDC96"] }), " and", " ", _jsxs("span", { className: "font-display font-bold text-btc", children: [trophies, " \uD83C\uDFC6"] }), "."] }), _jsx("div", { className: "text-inkSoft text-xs italic font-semibold", children: "Your Finis remember the green candles. The market remembers them too. \uD83C\uDF08" }), _jsxs("div", { className: "flex gap-2 justify-center pt-2", children: [_jsx("button", { onClick: exit, className: "kbtn kbtn-ghost px-5 py-2.5", children: "Title" }), _jsx("button", { onClick: start, className: "kbtn kbtn-mint px-6 py-2.5", children: "\u2728 New Run" })] })] }) }));
-}

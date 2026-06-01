@@ -6,6 +6,10 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# tsc shouldn't emit .js next to .ts (we use Vite); guard against it just in case
+src/**/*.js
+src/**/*.jsx
+
 # Local env (never commit secrets)
 .env
 .env.local
