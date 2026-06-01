@@ -39,6 +39,23 @@ export function samplesFor(symbol: string): number {
 }
 
 /**
+ * Return the {price, ts} samples for a symbol within the past windowMs,
+ * oldest-first. For drawing price graphs. Returns [] when no history.
+ */
+export function priceSeries(symbol: string, windowMs: number): { price: number; ts: number }[] {
+  const list = histories.get(symbol);
+  if (!list || list.length === 0) return [];
+  const cutoff = Date.now() - windowMs;
+  return list.filter(s => s.ts >= cutoff).map(s => ({ price: s.price, ts: s.ts }));
+}
+
+/** Latest recorded price for a symbol, or null. */
+export function latestPrice(symbol: string): number | null {
+  const list = histories.get(symbol);
+  return list && list.length ? list[list.length - 1].price : null;
+}
+
+/**
  * Compute price change over the past `windowMs`.
  * Returns the fractional change (0.005 = +0.5%, -0.02 = -2%).
  * Returns null if we don't have enough history yet, or it's stale.

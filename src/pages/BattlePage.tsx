@@ -7,6 +7,8 @@ import { MOCK_INSTANCES } from "../data/mockBattleInstances";
 import { useCoinStore, fmtCoin } from "../state/coinStore";
 import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
+import { LiveMarketCard } from "../components/PriceGraph";
+import { useLivePrices } from "../hooks/useLivePrices";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 
 const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -29,6 +31,10 @@ export function BattlePage() {
   const { battleId = "" } = useParams<{ battleId: string }>();
   const battle = getBattleById(battleId);
   const { walletAddress } = useUIStore();
+  // Keep the live price feed polling while on this page so the velocity tracker
+  // (which powers the price graph + % readouts) has fresh data even if the user
+  // landed here directly without visiting the Crypto Arena first.
+  useLivePrices();
   const [stake, setStake] = useState("100");
   const [selectedSide, setSelectedSide] = useState<"A" | "B" | null>(null);
   const [predicting, setPredicting] = useState(false);
@@ -175,6 +181,16 @@ export function BattlePage() {
               color={color}
               userBet={predictResult && predictResult.ok ? predictResult : null}
             />
+
+            {/* Live market data — % since open + price graph (Up/Down + Outperform only) */}
+            {(battle.type === "updown" || battle.type === "outperform") && (
+              <LiveMarketCard
+                battleId={battle.id}
+                assets={battle.assets}
+                colors={ASSET_COLORS}
+                durationLabel={battle.durationLabel}
+              />
+            )}
 
             {/* Probability panel */}
             <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
