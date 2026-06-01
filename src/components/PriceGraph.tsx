@@ -32,7 +32,8 @@ export function PriceGraph({
 }) {
   const W = 600; // viewBox width (scales responsively)
   const H = height;
-  const padTop = 16, padBottom = 22, padX = 8;
+  const padTop = 16, padBottom = 22;
+  const padX = 8, padRight = 46; // extra right room for the % axis labels
 
   const now0 = Date.now();
   // Build normalised (% change from opening) point arrays for each asset.
@@ -71,16 +72,54 @@ export function PriceGraph({
   const now = Date.now();
   const tMin = now - windowMs, tMax = now;
 
-  const xOf = (ts: number) => padX + ((ts - tMin) / (tMax - tMin)) * (W - 2 * padX);
+  const xOf = (ts: number) => padX + ((ts - tMin) / (tMax - tMin)) * (W - padX - padRight);
   const yOf = (pct: number) => padTop + ((yMax - pct) / (yMax - yMin)) * (H - padTop - padBottom);
   const zeroY = yOf(0);
+
+  // CoinGecko-style % gridlines: pick a "nice" step and draw evenly.
+  const niceStep = (span: number) => {
+    const raw = span / 4;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / pow;
+    const step = n >= 5 ? 5 : n >= 2 ? 2 : 1;
+    return step * pow;
+  };
+  const step = niceStep(yMax - yMin);
+  const gridVals: number[] = [];
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) gridVals.push(Number(v.toFixed(4)));
+
+  // Time markers (3 evenly spaced) for the bottom axis
+  const timeMarks = [0, 0.5, 1].map(f => tMin + f * (tMax - tMin));
+  const fmtClock = (ts: number) => {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
 
   return (
     <div style={{ width: "100%", fontFamily: "'Nunito', system-ui, sans-serif" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} preserveAspectRatio="none">
-        {/* Zero baseline */}
-        <line x1={padX} y1={zeroY} x2={W - padX} y2={zeroY} stroke="#e5e7eb" strokeWidth="1.5" strokeDasharray="4 4" />
-        <text x={padX + 2} y={zeroY - 4} fontSize="10" fill="#aaa" fontWeight="700">open</text>
+        {/* Horizontal % gridlines + right-axis labels (CoinGecko style) */}
+        {gridVals.map(v => {
+          const y = yOf(v);
+          const isZero = Math.abs(v) < 1e-9;
+          return (
+            <g key={v}>
+              <line x1={padX} y1={y} x2={W - padRight} y2={y}
+                stroke={isZero ? "#d1d5db" : "#f1f3f5"} strokeWidth={isZero ? 1.5 : 1}
+                strokeDasharray={isZero ? "4 4" : undefined} />
+              <text x={W - padRight + 6} y={y + 3.5} fontSize="10" fill="#aaa" fontWeight="700">
+                {v > 0 ? "+" : ""}{v.toFixed(maxAbs < 2 ? 1 : 0)}%
+              </text>
+            </g>
+          );
+        })}
+        {/* Bottom time axis */}
+        {timeMarks.map((ts, i) => (
+          <text key={ts} x={xOf(ts)} y={H - 6} fontSize="9" fill="#bbb" fontWeight="600"
+            textAnchor={i === 0 ? "start" : i === timeMarks.length - 1 ? "end" : "middle"}>
+            {fmtClock(ts)}
+          </text>
+        ))}
 
         {!hasData && (
           <text x={W / 2} y={H / 2} fontSize="13" fill="#bbb" textAnchor="middle" fontWeight="600">
