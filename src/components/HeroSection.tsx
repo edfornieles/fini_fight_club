@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { useEffect, useRef } from "react";
 import { useUIStore } from "../state/uiStore";
 import { useGameStore } from "../state/gameStore";
@@ -181,10 +182,10 @@ export function HeroSection() {
 
           <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "center", minHeight: 480 }}>
             <video autoPlay loop muted playsInline style={{ position: "absolute", top: "12%", left: "4%", height: "28%", width: "auto", objectFit: "contain", opacity: 0.9 }}>
-              <source src="/hero/skull.mp4" type="video/mp4" />
+              <source src={asset("/hero/skull.mp4")} type="video/mp4" />
             </video>
             <video autoPlay loop muted playsInline style={{ height: "88%", maxHeight: 480, width: "auto", objectFit: "contain", position: "relative", zIndex: 1, marginRight: "5%" }}>
-              <source src="/hero/sunflower.mp4" type="video/mp4" />
+              <source src={asset("/hero/sunflower.mp4")} type="video/mp4" />
             </video>
           </div>
         </div>
@@ -231,7 +232,7 @@ export function HeroSection() {
 
           <div style={{ position: "relative", minHeight: 500 }}>
             <img
-              src="/hero/fight_club.png"
+              src={asset("/hero/fight_club.png")}
               alt="Fini fight club characters"
               style={{
                 width: "110%", maxWidth: 680,

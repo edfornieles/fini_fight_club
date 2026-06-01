@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { Link } from "react-router-dom";
 import { useLivePrices, fmtChange } from "../hooks/useLivePrices";
 
@@ -219,7 +220,7 @@ function TopDamageHero({ fini }: { fini: typeof FIGHT_CLUB_TOP_DAMAGE[number] })
           position: "relative", overflow: "hidden",
         }}>
           <img
-            src={`/clan-art/${slugify(fini.clan)}.gif`}
+            src={asset(`/clan-art/${slugify(fini.clan)}.gif`)}
             alt={fini.clan}
             style={{ height: 180, width: "auto", objectFit: "contain" }}
             onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}

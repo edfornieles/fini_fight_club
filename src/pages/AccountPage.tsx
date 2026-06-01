@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { useState } from "react";
 import { useUIStore } from "../state/uiStore";
 import { Link } from "react-router-dom";
@@ -297,7 +298,7 @@ export function AccountPage() {
                       >
                         <div style={{ background: CLAN_TINTS[f.clan] ?? "#c8c8d8", height: 110, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                           <img
-                            src={`/clan-art/${slugify(f.clan)}.gif`}
+                            src={asset(`/clan-art/${slugify(f.clan)}.gif`)}
                             alt={f.clan}
                             style={{ height: 80, width: "auto", objectFit: "contain" }}
                             onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
@@ -371,7 +372,7 @@ function TeamSlot({ fini, label, onRemove, onSelect, isActive }: {
         }}
       >
         <div style={{ background: CLAN_TINTS[fini.clan] ?? "#ccc", height: 100, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-          <img src={`/clan-art/${slugify(fini.clan)}.gif`} alt="" style={{ height: 72, objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 72, objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           {/* Remove hint */}
           <div data-hint style={{
             position: "absolute", inset: 0,

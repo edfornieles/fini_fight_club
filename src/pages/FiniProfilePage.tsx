@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { useParams, Link } from "react-router-dom";
 import { useFiniRecords, computeFiniPower, tierFor, xpToNextLevel, fmtRestTime } from "../state/finiRecords";
 
@@ -104,7 +105,7 @@ export function FiniProfilePage() {
               boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
               flexShrink: 0,
             }}>
-              <img src={`/clan-art/${slugify(meta.clan)}.gif`} alt={meta.clan} style={{ height: 130, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <img src={asset(`/clan-art/${slugify(meta.clan)}.gif`)} alt={meta.clan} style={{ height: 130, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               {/* Level badge */}
               <div style={{
                 position: "absolute", bottom: 8, left: 8,

@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ALL_COIN_FAMILIES, type CoinFamily, type PassiveAbility } from "../game/types";
 import { loadTaxonomy, familyView, type TaxonomyDataset, type ClanEntry } from "../game/taxonomy";
@@ -29,8 +30,8 @@ const PASSIVE_LABEL: Record<PassiveAbility, string> = {
 };
 
 function slugify(n: string) { return n.toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); }
-function clanGifUrl(name: string) { return `/clan-art/${slugify(name)}.gif`; }
-function finiVideoUrl(slug: string, id: string) { return `/clan-finis/${slug}/${id}.mp4`; }
+function clanGifUrl(name: string) { return asset(`/clan-art/${slugify(name)}.gif`); }
+function finiVideoUrl(slug: string, id: string) { return asset(`/clan-finis/${slug}/${id}.mp4`); }
 function shortAddr(a: string) { return `${a.slice(0, 6)}...${a.slice(-4)}`; }
 function moodFromDelta(delta: number): FiniMood {
   if (delta > 0.02) return "happy";
@@ -92,7 +93,7 @@ export function ExploreSection() {
     if (loaded) return;
     Promise.all([
       loadTaxonomy(),
-      fetch("/clan-finis/manifest.json").then(r => r.json()).catch(() => null),
+      fetch(asset("/clan-finis/manifest.json")).then(r => r.json()).catch(() => null),
     ]).then(([tax, man]) => { setDataset(tax); setManifest(man); setLoaded(true); });
   }, [loaded]);
 
@@ -520,7 +521,7 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
           </video>
         ) : (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <img src={`/clan-art/${clanSlug}.gif`} alt={clan.clan} style={{ height: "80%", width: "auto", objectFit: "contain" }} />
+            <img src={asset(`/clan-art/${clanSlug}.gif`)} alt={clan.clan} style={{ height: "80%", width: "auto", objectFit: "contain" }} />
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { useEffect, useState, useRef } from "react";
 import { ALL_COIN_FAMILIES, type CoinFamily, type PassiveAbility } from "../game/types";
 import {
@@ -30,8 +31,8 @@ function slugify(name: string) {
   return name.toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
-function clanGifUrl(clanName: string) { return `/clan-art/${slugify(clanName)}.gif`; }
-function finiVideoUrl(clanSlug: string, tokenId: string) { return `/clan-finis/${clanSlug}/${tokenId}.mp4`; }
+function clanGifUrl(clanName: string) { return asset(`/clan-art/${slugify(clanName)}.gif`); }
+function finiVideoUrl(clanSlug: string, tokenId: string) { return asset(`/clan-finis/${clanSlug}/${tokenId}.mp4`); }
 
 // ─── Card palette ─────────────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ export function ExploreOverlay() {
     if (!open || loaded) return;
     Promise.all([
       loadTaxonomy(),
-      fetch("/clan-finis/manifest.json").then(r => r.json()).catch(() => null),
+      fetch(asset("/clan-finis/manifest.json")).then(r => r.json()).catch(() => null),
     ]).then(([tax, man]) => {
       setDataset(tax);
       setManifest(man);
@@ -196,7 +197,7 @@ export function ExploreOverlay() {
                         const vc = clan as VirtualClan;
                         const cSlug = vc.isSpecial || vc.isMythical ? "special" : slugify(clan.clan);
                         const palette = clanPalette(cSlug, vc.isSpecial, vc.isMythical);
-                        const gifUrl = vc.isSpecial || vc.isMythical ? "/clan-art/special.gif" : clanGifUrl(clan.clan);
+                        const gifUrl = vc.isSpecial || vc.isMythical ? asset("/clan-art/special.gif") : clanGifUrl(clan.clan);
                         return (
                           <button key={clan.clan} onClick={() => { setSelectedClanIdx(absIdx); setFiniIdx(0); }} style={{
                             display: "flex", flexDirection: "column", borderRadius: 16,
@@ -376,7 +377,7 @@ function FiniViewer({
         ) : (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <img
-              src={isSpecial || isMythical ? "/clan-art/special.gif" : `/clan-art/${clanSlug}.gif`}
+              src={isSpecial || isMythical ? asset("/clan-art/special.gif") : asset(`/clan-art/${clanSlug}.gif`)}
               alt={clan.clan}
               style={{ height: "80%", width: "auto", objectFit: "contain" }}
             />

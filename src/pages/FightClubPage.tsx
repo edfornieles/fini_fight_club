@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useUIStore } from "../state/uiStore";
@@ -1271,7 +1272,7 @@ function BattleFiniCard({ fini, hp, maxHp, attacking, defending, ko }: { fini: F
       boxShadow: attacking ? "0 8px 24px rgba(244,114,182,0.30)" : defending ? "0 0 0 3px #ef4444" : "0 1px 3px rgba(0,0,0,0.06)",
     }}>
       <div style={{ background: CLAN_TINTS[fini.clan] ?? "#ddd", height: 100, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src={`/clan-art/${slugify(fini.clan)}.gif`} alt="" style={{ height: 76, width: "auto", objectFit: "contain", filter: ko ? "grayscale(1)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 76, width: "auto", objectFit: "contain", filter: ko ? "grayscale(1)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
         {fini.item && (
           <div title={fini.item.name} style={{
             position: "absolute", top: 6, right: 6,
@@ -1458,7 +1459,7 @@ function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap
         </div>
       )}
       <div style={{ background: CLAN_TINTS[fini.clan] ?? "#ddd", height: 120, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <img src={`/clan-art/${slugify(fini.clan)}.gif`} alt="" style={{ height: 90, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 90, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
         {fini.item && (
           <div title={fini.item.name + " — " + fini.item.effect} style={{
             position: "absolute", top: 8, right: 8,

@@ -1,3 +1,4 @@
+import { asset } from "../lib/assetUrl";
 import { ExploreSection } from "../components/ExploreSection";
 import { FooterSection } from "../components/FooterSection";
 
@@ -41,7 +42,7 @@ export function LandingPage() {
           </div>
           <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "center", minHeight: 480 }}>
 <video autoPlay loop muted playsInline style={{ height: "88%", maxHeight: 480, width: "auto", objectFit: "contain", position: "relative", zIndex: 1, marginRight: "5%" }}>
-              <source src="/hero/sunflower.mp4" type="video/mp4" />
+              <source src={asset("/hero/sunflower.mp4")} type="video/mp4" />
             </video>
           </div>
         </div>
@@ -67,7 +68,7 @@ export function LandingPage() {
             <p style={{ marginTop: 16, fontSize: 16, color: "#555", fontWeight: 600 }}>Build teams, battle, win rewards</p>
           </div>
           <div style={{ position: "relative", minHeight: 500 }}>
-            <img src="/hero/fight_club.png" alt="Fini fight club characters" style={{ width: "110%", maxWidth: 680, objectFit: "contain", position: "absolute", bottom: 0, right: "-60px" }} />
+            <img src={asset("/hero/fight_club.png")} alt="Fini fight club characters" style={{ width: "110%", maxWidth: 680, objectFit: "contain", position: "absolute", bottom: 0, right: "-60px" }} />
           </div>
         </div>
       </section>
