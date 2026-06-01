@@ -16,7 +16,8 @@
 import { create } from "zustand";
 import { MOCK_BATTLES, type Battle } from "./mockBattles";
 import { getCachedPrices } from "../lib/priceProviders";
-import { snapBattleOpening } from "../lib/openingPrices";
+import { snapBattleOpening, intraWindowReturn } from "../lib/openingPrices";
+import { personaFor, personaPickSide } from "../lib/ghostPersonas";
 
 // Parse "15m" / "1h" / "24h" → milliseconds
 function parseDuration(label: string): number {
@@ -87,6 +88,10 @@ function fairOddsForBattle(battle: Battle, initialEndsAt: number): number {
 
 
 interface GhostTeam { wallet: string; ownedCount: number }
+// We use the TOP 100 by ownedCount as the active automated-trader pool.
+// These are the players the crypto arena feed populates with — recognisable
+// personas, deterministic biases, reacting to real market signals.
+const TOP_N_ACTIVE_TRADERS = 100;
 let ghostWallets: GhostTeam[] = [];
 let walletsLoaded = false;
 
@@ -97,7 +102,13 @@ async function loadWallets() {
     const r = await fetch("/data/ghostTeams.json");
     if (r.ok) {
       const j = await r.json();
-      ghostWallets = j.teams ?? [];
+      // Sort by holdings desc and take the top 100 — these are our active
+      // automated traders. Bigger holders show up more often, larger bets.
+      const all: GhostTeam[] = j.teams ?? [];
+      ghostWallets = all
+        .slice()
+        .sort((a, b) => b.ownedCount - a.ownedCount)
+        .slice(0, TOP_N_ACTIVE_TRADERS);
     }
   } catch { /* fall back to empty */ }
 }
@@ -182,17 +193,31 @@ export const useCryptoSim = create<SimState>((set, get) => ({
         return weighted[weighted.length - 1];
       }
 
-      for (let i = 0; i < numEntries; i++) {
+      // Up to numEntries attempts — some personas will sit out, so we may
+      // produce fewer actual entries than attempts. This is healthy: traders
+      // shouldn't all act every tick.
+      let attempts = 0;
+      while (newEntries.length < numEntries && attempts < numEntries * 3) {
+        attempts++;
         const picked = pickWeightedBattle();
         const battle = picked.battle;
-        const fairA = picked.pA; // probability side A is correct (0..1)
+        // Weight wallet selection by holdings (bigger holders trade more often)
         const w = ghostWallets[Math.floor(Math.random() * ghostWallets.length)];
-        // Higher-owned wallets stake more
+        const persona = personaFor(w.wallet, w.ownedCount);
+
+        // Persona decides whether and how to act. Reads live signals —
+        // intra-window return for swing traders, market % for momentum/contrarian.
+        const primaryAsset = battle.assets[0];
+        const ret = intraWindowReturn(battle.id, primaryAsset);
+        const side = personaPickSide(persona, {
+          sideAPct: battle.sideA.pct,
+          intraWindowReturnA: ret,
+        });
+        if (!side) continue; // persona sat this one out
+
+        // Bet size scales with holdings + adds a small persona-specific jitter
         const baseAmount = 50 + Math.floor(Math.random() * 200);
         const amount = baseAmount + Math.floor(Math.sqrt(w.ownedCount) * 25);
-        // Side is biased by fair odds — late-stage battles see ~95% of bots
-        // pile onto the favored side, matching arbitrage behaviour IRL.
-        const side: "A" | "B" = Math.random() < fairA ? "A" : "B";
         const sideLabel = side === "A" ? battle.sideA.label : battle.sideB.label;
         lastTickId++;
         newEntries.push({

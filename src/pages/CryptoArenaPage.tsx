@@ -56,6 +56,13 @@ export function CryptoArenaPage() {
             <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: "#dcfce7", color: "#15803d" }}>
               {liveCount} Live
             </span>
+            <span title="Top 100 Fini holders are running automated strategies that react to live market signals" style={{
+              fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100,
+              background: "#ede9fe", color: "#6d28d9",
+              display: "inline-flex", alignItems: "center", gap: 5,
+            }}>
+              ⚡ 100 traders active
+            </span>
             <Link to="/strategies" style={{
               marginLeft: "auto",
               display: "inline-flex", alignItems: "center", gap: 6,

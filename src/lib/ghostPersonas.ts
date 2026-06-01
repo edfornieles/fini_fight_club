@@ -121,3 +121,45 @@ export function personaFor(wallet: string, ownedCount = 0): GhostPersona {
   cache.set(key, persona);
   return persona;
 }
+
+/**
+ * Decide which side a persona would forecast on, based on their bias and
+ * the live market state. Reacts to real signals — momentum traders chase
+ * the leader, contrarians back the underdog, loyalists pick their favourite
+ * side, swing traders look for divergence, balanced players take the
+ * fair-odds-weighted coin flip.
+ *
+ * Returns null when the persona decides to sit out this opportunity.
+ */
+interface MarketCtx {
+  sideAPct: number;          // 0-100, current market %
+  intraWindowReturnA?: number | null; // -0.05..+0.05 etc, for primary asset
+}
+export function personaPickSide(persona: GhostPersona, ctx: MarketCtx): "A" | "B" | null {
+  const { bias } = persona;
+  const diff = ctx.sideAPct - 50; // positive = A leading
+  const ret = ctx.intraWindowReturnA ?? 0;
+
+  switch (bias) {
+    case "momentum":
+      // Chase the leader if it's gained ≥7% from neutral
+      if (Math.abs(diff) < 7) return null;
+      return diff > 0 ? "A" : "B";
+    case "contrarian":
+      // Back the underdog if they're below 40%
+      if (ctx.sideAPct < 40) return "A";
+      if (ctx.sideAPct > 60) return "B";
+      return null;
+    case "loyalist":
+      // Always pick A — these are the "BTC Up forever" types
+      return "A";
+    case "swing":
+      // React to the live underlying — pick the side reality is confirming
+      if (Math.abs(ret) < 0.001) return null;
+      return ret > 0 ? "A" : "B";
+    case "balanced":
+    default:
+      // Fair-odds-weighted: A more likely when A is favoured, but still some entropy
+      return Math.random() < (ctx.sideAPct / 100) ? "A" : "B";
+  }
+}
