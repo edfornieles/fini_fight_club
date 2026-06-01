@@ -119,11 +119,8 @@ export function LeaderboardPage() {
             </SubCard>
 
             {/* Top damage dealers */}
-            <SubCard title="Top Damage Dealers" subtitle="Single Finis by total damage across all battles">
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {FIGHT_CLUB_TOP_DAMAGE.map(d => <DamageRow key={d.rank} fini={d} />)}
-              </div>
-            </SubCard>
+            {/* Single featured Fini — the #1 damage dealer overall, hero card */}
+            <TopDamageHero fini={FIGHT_CLUB_TOP_DAMAGE[0]} />
           </div>
         </Section>
 
@@ -204,41 +201,73 @@ function TeamRow({ team }: { team: typeof FIGHT_CLUB_TOP_TEAMS[number] }) {
   );
 }
 
-function DamageRow({ fini }: { fini: typeof FIGHT_CLUB_TOP_DAMAGE[number] }) {
+function TopDamageHero({ fini }: { fini: typeof FIGHT_CLUB_TOP_DAMAGE[number] }) {
+  const familyColor = FAMILY_META[fini.family]?.color ?? "#dc2626";
   return (
-    <Link to={`/fini/${fini.tokenId}`} style={{ textDecoration: "none", color: "inherit" }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "10px 12px", borderRadius: 10,
-        background: "#fff", border: "1.5px solid #f0f0f0",
-        cursor: "pointer", transition: "background 0.12s",
-      }}
-        onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
-        onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
-      >
-        <RankBadge rank={fini.rank} />
-        <div style={{
-          width: 30, height: 30, borderRadius: "50%",
-          background: CLAN_TINTS[fini.clan] ?? "#ddd",
-          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0,
-        }}>
-          <img src={`/clan-art/${slugify(fini.clan)}.gif`} alt="" style={{ height: 26 }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>
-            #{fini.tokenId} <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 100, background: "#f3f4f6", color: "#666" }}>{fini.family}</span>
-          </div>
-          <div style={{ fontSize: 10, color: "#888" }}>{fini.clan}</div>
-        </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 900, color: "#dc2626" }}>
-            {fini.totalDamage.toLocaleString()} <span style={{ fontSize: 9, color: "#888", fontWeight: 600 }}>DMG</span>
-          </div>
-          <div style={{ fontSize: 10, color: "#aaa" }}>{fini.kos} KOs</div>
-        </div>
+    <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: "18px 20px" }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>Top Damage Dealer</div>
+        <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>The single Fini with the most damage across all battles</div>
       </div>
-    </Link>
+
+      <Link to={`/fini/${fini.tokenId}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+        {/* Hero portrait with damage-king ribbon */}
+        <div style={{
+          background: CLAN_TINTS[fini.clan] ?? "#fee2e2",
+          borderRadius: 14, height: 220,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative", overflow: "hidden",
+        }}>
+          <img
+            src={`/clan-art/${slugify(fini.clan)}.gif`}
+            alt={fini.clan}
+            style={{ height: 180, width: "auto", objectFit: "contain" }}
+            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+          {/* Diagonal ribbon */}
+          <div style={{
+            position: "absolute", top: 14, right: -32,
+            transform: "rotate(28deg)",
+            background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff",
+            padding: "5px 40px", fontSize: 11, fontWeight: 800,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            letterSpacing: 0.5,
+          }}>
+            💥 Damage King
+          </div>
+        </div>
+
+        {/* Identity row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <RankBadge rank={fini.rank} size={28} />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#111", display: "flex", alignItems: "center", gap: 8 }}>
+                Fini #{fini.tokenId}
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: familyColor + "22", color: familyColor }}>{fini.family}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#888" }}>{fini.clan} · owned by {fini.owner}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Headline stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: "#dc2626", textTransform: "uppercase", letterSpacing: 0.5 }}>Total Damage</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#dc2626", marginTop: 2 }}>{fini.totalDamage.toLocaleString()}</div>
+          </div>
+          <div style={{ background: "#fff7ed", border: "1.5px solid #fed7aa", borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: "#c2410c", textTransform: "uppercase", letterSpacing: 0.5 }}>KOs</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#c2410c", marginTop: 2 }}>{fini.kos}</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, fontSize: 11, color: "#aaa", textAlign: "center" }}>
+          Tap to view full profile →
+        </div>
+      </Link>
+    </div>
   );
 }
 
