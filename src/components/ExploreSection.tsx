@@ -336,11 +336,6 @@ export function ExploreSection() {
         </div>
       )}
 
-      {dataset && tab === "browse" && (
-        <p style={{ fontSize: 11, color: "#bbb", marginTop: 32 }}>
-          {dataset.scanned.toLocaleString()} Finis scanned · families beat the one they counter (x1.1) and lose to the next (x0.9).
-        </p>
-      )}
     </section>
   );
 }
