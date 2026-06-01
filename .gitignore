@@ -42,3 +42,6 @@ public/clan-art/
 public/clan-finis/
 public/hero/
 .vercel
+
+# Production env (anon key is public but keep build config out of git)
+.env.production
