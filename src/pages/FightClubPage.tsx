@@ -8,6 +8,7 @@ import { useInventory, POTIONS, type PotionId } from "../state/inventory";
 import { useTicker } from "../hooks/useTicker";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { pickGhostOpponent, shortenWallet, synthFini, loadGhostTeams } from "../game/ghostOpponents";
+import { FAMILY_ROLE, ROLE_META, ITEM_SYNERGY, SYNERGY_BONUS_MULTIPLIER, hasSynergy, familyDamageMultiplier, type FamilyRole } from "../game/familyRoles";
 
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
@@ -314,15 +315,23 @@ export function FightClubPage() {
     // Deduct the Crumb price first. Bail if the player can't afford it.
     const ok = useCrumbStore.getState().spend(item.price);
     if (!ok) { alert(`Not enough 🍪 Crumbs (${item.price} needed)`); return; }
-    if (target === "team") {
-      const next = [...team];
-      const f = { ...next[idx], item, atk: next[idx].atk + (item.bonus.atk ?? 0), def: next[idx].def + (item.bonus.def ?? 0), maxHp: next[idx].maxHp + (item.bonus.hp ?? 0), hp: next[idx].hp + (item.bonus.hp ?? 0), speed: next[idx].speed + (item.bonus.speed ?? 0) };
-      next[idx] = f; setTeam(next);
-    } else {
-      const next = [...bench];
-      const f = { ...next[idx], item, atk: next[idx].atk + (item.bonus.atk ?? 0), def: next[idx].def + (item.bonus.def ?? 0), maxHp: next[idx].maxHp + (item.bonus.hp ?? 0), hp: next[idx].hp + (item.bonus.hp ?? 0), speed: next[idx].speed + (item.bonus.speed ?? 0) };
-      next[idx] = f; setBench(next);
-    }
+    // Apply role synergy: items get +50% bonus on a same-role Fini.
+    const arr = target === "team" ? team : bench;
+    const target_fini = arr[idx];
+    const synergize = hasSynergy(item.name, target_fini.family);
+    const mult = synergize ? SYNERGY_BONUS_MULTIPLIER : 1;
+    const atkB   = Math.round((item.bonus.atk ?? 0)   * mult);
+    const defB   = Math.round((item.bonus.def ?? 0)   * mult);
+    const hpB    = Math.round((item.bonus.hp ?? 0)    * mult);
+    const spdB   = Math.round((item.bonus.speed ?? 0) * mult);
+    const buffed = {
+      ...target_fini, item,
+      atk: target_fini.atk + atkB, def: target_fini.def + defB,
+      maxHp: target_fini.maxHp + hpB, hp: target_fini.hp + hpB,
+      speed: target_fini.speed + spdB,
+    };
+    if (target === "team") { const next = [...team]; next[idx] = buffed; setTeam(next); }
+    else                   { const next = [...bench]; next[idx] = buffed; setBench(next); }
     setShop(shop.filter(s => s.name !== item.name));
   }
 
@@ -670,6 +679,25 @@ function WorkshopView({
                     <div style={{ fontSize: 32, marginBottom: 4 }}>{item.icon}</div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>{item.name}</div>
                     <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{item.effect}</div>
+                    {/* Synergy hint — which role this item pairs with */}
+                    {(() => {
+                      const syn = ITEM_SYNERGY[item.name];
+                      if (!syn) return (
+                        <div style={{ marginTop: 4, fontSize: 9, fontWeight: 700, color: "#aaa" }}>Universal</div>
+                      );
+                      const meta = ROLE_META[syn as FamilyRole];
+                      return (
+                        <div title={`+50% bonus on a ${meta.name} Fini`} style={{
+                          marginTop: 4, fontSize: 9, fontWeight: 800,
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          background: meta.bgTint, color: meta.color,
+                          padding: "2px 7px", borderRadius: 100,
+                        }}>
+                          <span>{meta.icon}</span>
+                          <span>{meta.name} +50%</span>
+                        </div>
+                      );
+                    })()}
                     <div style={{ marginTop: 8, fontSize: 12, fontWeight: 800, color: cantAfford ? "#aaa" : "#854d0e" }}>
                       🍪 {item.price}
                     </div>
@@ -1014,11 +1042,14 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
 
       const atk = aliveAttackers[turn % aliveAttackers.length];
       const def = aliveDefenders[Math.floor(Math.random() * aliveDefenders.length)];
-      // Damage formula: ATK - DEF/2 + ±2 variance, min 1
+      // Damage formula: ATK - DEF/2 + ±2 variance, min 1, with family-role
+      // type advantage (Tank > Striker > Healer > Tank) multiplying by 1.3 /
+      // 0.7 / 1.0 — and a crit boost when SPD outpaces the target.
       const variance = Math.floor(Math.random() * 5) - 2; // -2..+2
       const base = atk.f.atk - Math.floor(def.f.def / 2);
       const crit = Math.random() < (atk.f.speed > def.f.speed ? 0.18 : 0.08);
-      let dmg = Math.max(1, base + variance);
+      const roleMult = familyDamageMultiplier(atk.f.family, def.f.family);
+      let dmg = Math.max(1, Math.round((base + variance) * roleMult));
       if (crit) dmg = Math.round(dmg * 1.5);
 
       setAttacker({ side: attackerSide, idx: atk.i });
@@ -1038,12 +1069,22 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
         setTeamHp(nextTh);
       }
 
-      // Rich log entry: attacker, defender, damage, KO + item flavor if equipped
+      // Rich log entry: attacker, defender, damage, KO + item flavor + type
+      // advantage if applicable (Tank > Striker > Healer > Tank).
       const item = atk.f.item ? ` ${atk.f.item.icon}` : "";
-      const headline = `${atk.f.family} #${atk.f.id}${item} ${crit ? "lands a CRIT on" : "strikes"} ${def.f.family} #${def.f.id} — ${dmg} dmg`;
+      const atkRole = ROLE_META[FAMILY_ROLE[atk.f.family] ?? "striker"];
+      const defRole = ROLE_META[FAMILY_ROLE[def.f.family] ?? "striker"];
+      const advTag = roleMult >= 1.3 ? " 💥 SUPER EFFECTIVE"
+                  : roleMult <= 0.7 ? " 🛡 resisted"
+                  : "";
+      const verb = crit ? "lands a CRIT on" : roleMult >= 1.3 ? "smashes into" : roleMult <= 0.7 ? "scrapes" : "strikes";
+      const headline = `${atk.f.family} #${atk.f.id}${item} ${verb} ${def.f.family} #${def.f.id} — ${dmg} dmg${advTag}`;
+      const roleNote = roleMult === 1
+        ? ""
+        : ` ${atkRole.icon}${atkRole.name} ${roleMult >= 1.3 ? ">" : "<"} ${defRole.icon}${defRole.name} (×${roleMult.toFixed(1)})`;
       const details =
         (kos ? `KO! ${def.f.family} #${def.f.id} is knocked out. ` : `${def.f.family} #${def.f.id}: ${defHpAfter}/${def.f.maxHp} HP. `) +
-        `(${atk.f.atk} ATK vs ${def.f.def} DEF, ${variance >= 0 ? "+" : ""}${variance} variance${crit ? ", ×1.5 crit" : ""})`;
+        `(${atk.f.atk} ATK vs ${def.f.def} DEF${roleNote}${crit ? ", ×1.5 crit" : ""}${variance !== 0 ? `, ${variance > 0 ? "+" : ""}${variance} variance` : ""})`;
       setLog(l => [...l.slice(-8), { side: attackerSide, msg: headline, details, key: Date.now() + Math.random() }]);
 
       battleRef.current.turn++;
@@ -1361,6 +1402,25 @@ function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap
           }}>{fini.item.icon}</div>
         )}
         <div style={{ position: "absolute", top: 8, left: 8, fontSize: 9, fontWeight: 800, color: "#fff", background: "rgba(0,0,0,0.45)", padding: "2px 7px", borderRadius: 100, textTransform: "uppercase", letterSpacing: "0.06em" }}>{position}</div>
+        {/* Role chip — Tank / Striker / Healer */}
+        {(() => {
+          const role = FAMILY_ROLE[fini.family];
+          if (!role) return null;
+          const meta = ROLE_META[role];
+          return (
+            <div title={meta.description} style={{
+              position: "absolute", top: 8, right: fini.item ? 46 : 8,
+              background: meta.bgTint, color: meta.color,
+              fontSize: 9, fontWeight: 800,
+              padding: "3px 8px", borderRadius: 100,
+              boxShadow: "0 2px 6px rgba(0,0,0,0.10)",
+              display: "flex", alignItems: "center", gap: 3,
+            }}>
+              <span>{meta.icon}</span>
+              <span>{meta.name}</span>
+            </div>
+          );
+        })()}
         {/* Level badge */}
         <div title={`${xp} XP · ${xpInfo.current}/${xpInfo.needed} to next level`} style={{
           position: "absolute", bottom: 8, left: 8,
