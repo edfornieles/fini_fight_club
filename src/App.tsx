@@ -25,7 +25,6 @@ import { SiteNav } from "./components/SiteNav";
 import { WalletSync } from "./components/WalletSync";
 import { DevWalletSwitcher } from "./components/DevWalletSwitcher";
 import { NotificationToasts } from "./components/NotificationToasts";
-import { BetaBanner } from "./components/BetaBanner";
 import { useBattleResolver } from "./hooks/useBattleResolver";
 import { useStrategyExecutor } from "./hooks/useStrategyExecutor";
 import { LandingPage } from "./pages/LandingPage";
@@ -51,7 +50,6 @@ export default function App() {
   useStrategyExecutor();
   return (
     <>
-      <BetaBanner />
       <WalletSync />
       <SiteNav />
       <DevWalletSwitcher />
