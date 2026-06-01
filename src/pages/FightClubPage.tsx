@@ -41,38 +41,38 @@ type Item = {
 };
 
 // 24 items — comparable to a normal Super Auto Pets game's shop pool.
-// SAP-restrained pricing: starting 30 🍪 affords any common; rares need ~4
-// battle wins; legendaries need ~10 wins or perfect frugality.
+// Tight SAP economy: starting 10 🍪 affords ONE common item (or 3 rerolls
+// + nothing else). Rares need ~3 wins. Legendaries need ~5+ wins.
 const ITEMS: Item[] = [
-  // ── Common — single-stat boosters (5-15 Crumbs) ─────────────────────────
-  { name: "Acorn",           icon: "🌰", effect: "+3 DEF",                  bonus: { def: 3 },              price: 5,  tier: "common" },
-  { name: "Pebble",          icon: "🪨", effect: "+4 ATK",                  bonus: { atk: 4 },              price: 6,  tier: "common" },
-  { name: "Spring Water",    icon: "💧", effect: "+6 HP",                   bonus: { hp: 6 },               price: 6,  tier: "common" },
-  { name: "Sneakers",        icon: "👟", effect: "+2 SPD",                  bonus: { speed: 2 },            price: 8,  tier: "common" },
-  { name: "Twig Stick",      icon: "🪵", effect: "+5 ATK",                  bonus: { atk: 5 },              price: 10, tier: "common" },
-  { name: "Leaf Vest",       icon: "🍃", effect: "+5 DEF",                  bonus: { def: 5 },              price: 10, tier: "common" },
-  { name: "Berry Juice",     icon: "🍓", effect: "+10 HP",                  bonus: { hp: 10 },              price: 12, tier: "common" },
-  { name: "Quick Cloak",     icon: "🧣", effect: "+3 SPD",                  bonus: { speed: 3 },            price: 14, tier: "common" },
+  // ── Common — single-stat boosters (3-7 Crumbs) ──────────────────────────
+  { name: "Acorn",           icon: "🌰", effect: "+3 DEF",                  bonus: { def: 3 },              price: 3,  tier: "common" },
+  { name: "Pebble",          icon: "🪨", effect: "+4 ATK",                  bonus: { atk: 4 },              price: 3,  tier: "common" },
+  { name: "Spring Water",    icon: "💧", effect: "+6 HP",                   bonus: { hp: 6 },               price: 3,  tier: "common" },
+  { name: "Sneakers",        icon: "👟", effect: "+2 SPD",                  bonus: { speed: 2 },            price: 4,  tier: "common" },
+  { name: "Twig Stick",      icon: "🪵", effect: "+5 ATK",                  bonus: { atk: 5 },              price: 5,  tier: "common" },
+  { name: "Leaf Vest",       icon: "🍃", effect: "+5 DEF",                  bonus: { def: 5 },              price: 5,  tier: "common" },
+  { name: "Berry Juice",     icon: "🍓", effect: "+10 HP",                  bonus: { hp: 10 },              price: 6,  tier: "common" },
+  { name: "Quick Cloak",     icon: "🧣", effect: "+3 SPD",                  bonus: { speed: 3 },            price: 7,  tier: "common" },
 
-  // ── Rare — combo boosters (20-40 Crumbs, ~3-4 wins to afford) ────────────
-  { name: "Diamond Shell",   icon: "💎", effect: "+10 DEF",                 bonus: { def: 10 },             price: 22, tier: "rare" },
-  { name: "Volatility Spike",icon: "⚡", effect: "+8 ATK",                  bonus: { atk: 8 },              price: 22, tier: "rare" },
-  { name: "Oracle Tonic",    icon: "🔮", effect: "+15 HP",                  bonus: { hp: 15 },              price: 24, tier: "rare" },
-  { name: "Speed Boots",     icon: "🥾", effect: "+5 SPD",                  bonus: { speed: 5 },            price: 24, tier: "rare" },
-  { name: "Battle Scar",     icon: "🩹", effect: "+5 ATK · +5 DEF",         bonus: { atk: 5, def: 5 },      price: 28, tier: "rare" },
-  { name: "Meme Charm",      icon: "🍀", effect: "+12 HP · +3 SPD",         bonus: { hp: 12, speed: 3 },    price: 28, tier: "rare" },
-  { name: "Cookie Pendant",  icon: "🍪", effect: "+8 HP · +4 ATK",          bonus: { hp: 8, atk: 4 },       price: 32, tier: "rare" },
-  { name: "Honey Pot",       icon: "🍯", effect: "+10 HP · +3 DEF",         bonus: { hp: 10, def: 3 },      price: 34, tier: "rare" },
-  { name: "Crystal Lens",    icon: "🔍", effect: "+6 ATK · +4 SPD",         bonus: { atk: 6, speed: 4 },    price: 38, tier: "rare" },
-  { name: "Rune Stone",      icon: "🗿", effect: "+8 DEF · +4 SPD",         bonus: { def: 8, speed: 4 },    price: 38, tier: "rare" },
+  // ── Rare — combo boosters (10-20 Crumbs, ~2-3 wins to afford) ───────────
+  { name: "Diamond Shell",   icon: "💎", effect: "+10 DEF",                 bonus: { def: 10 },             price: 10, tier: "rare" },
+  { name: "Volatility Spike",icon: "⚡", effect: "+8 ATK",                  bonus: { atk: 8 },              price: 10, tier: "rare" },
+  { name: "Oracle Tonic",    icon: "🔮", effect: "+15 HP",                  bonus: { hp: 15 },              price: 12, tier: "rare" },
+  { name: "Speed Boots",     icon: "🥾", effect: "+5 SPD",                  bonus: { speed: 5 },            price: 12, tier: "rare" },
+  { name: "Battle Scar",     icon: "🩹", effect: "+5 ATK · +5 DEF",         bonus: { atk: 5, def: 5 },      price: 14, tier: "rare" },
+  { name: "Meme Charm",      icon: "🍀", effect: "+12 HP · +3 SPD",         bonus: { hp: 12, speed: 3 },    price: 14, tier: "rare" },
+  { name: "Cookie Pendant",  icon: "🍪", effect: "+8 HP · +4 ATK",          bonus: { hp: 8, atk: 4 },       price: 16, tier: "rare" },
+  { name: "Honey Pot",       icon: "🍯", effect: "+10 HP · +3 DEF",         bonus: { hp: 10, def: 3 },      price: 17, tier: "rare" },
+  { name: "Crystal Lens",    icon: "🔍", effect: "+6 ATK · +4 SPD",         bonus: { atk: 6, speed: 4 },    price: 18, tier: "rare" },
+  { name: "Rune Stone",      icon: "🗿", effect: "+8 DEF · +4 SPD",         bonus: { def: 8, speed: 4 },    price: 18, tier: "rare" },
 
-  // ── Legendary — all-rounders & extreme stats (50-120 Crumbs) ────────────
-  { name: "Phoenix Feather", icon: "🪶", effect: "+15 HP · +6 ATK",         bonus: { hp: 15, atk: 6 },      price: 55, tier: "legendary" },
-  { name: "Ancient Helm",    icon: "🪖", effect: "+12 DEF · +8 HP",         bonus: { def: 12, hp: 8 },      price: 55, tier: "legendary" },
-  { name: "Dragon Scale",    icon: "🐉", effect: "+10 ATK · +10 DEF",       bonus: { atk: 10, def: 10 },    price: 70, tier: "legendary" },
-  { name: "Lightning Sigil", icon: "⚡", effect: "+12 ATK · +6 SPD",        bonus: { atk: 12, speed: 6 },   price: 75, tier: "legendary" },
-  { name: "Aurora Mantle",   icon: "🌌", effect: "+8 / +8 / +8 / +4",       bonus: { hp: 8, atk: 8, def: 8, speed: 4 }, price: 100, tier: "legendary" },
-  { name: "Eternal Idol",    icon: "🏆", effect: "+25 HP · +6 DEF · +6 ATK", bonus: { hp: 25, def: 6, atk: 6 }, price: 120, tier: "legendary" },
+  // ── Legendary — all-rounders & extreme stats (25-60 Crumbs) ─────────────
+  { name: "Phoenix Feather", icon: "🪶", effect: "+15 HP · +6 ATK",         bonus: { hp: 15, atk: 6 },      price: 26, tier: "legendary" },
+  { name: "Ancient Helm",    icon: "🪖", effect: "+12 DEF · +8 HP",         bonus: { def: 12, hp: 8 },      price: 28, tier: "legendary" },
+  { name: "Dragon Scale",    icon: "🐉", effect: "+10 ATK · +10 DEF",       bonus: { atk: 10, def: 10 },    price: 34, tier: "legendary" },
+  { name: "Lightning Sigil", icon: "⚡", effect: "+12 ATK · +6 SPD",        bonus: { atk: 12, speed: 6 },   price: 38, tier: "legendary" },
+  { name: "Aurora Mantle",   icon: "🌌", effect: "+8 / +8 / +8 / +4",       bonus: { hp: 8, atk: 8, def: 8, speed: 4 }, price: 48, tier: "legendary" },
+  { name: "Eternal Idol",    icon: "🏆", effect: "+25 HP · +6 DEF · +6 ATK", bonus: { hp: 25, def: 6, atk: 6 }, price: 60, tier: "legendary" },
 ];
 
 const STARTING_TEAM: Fini[] = [
@@ -328,8 +328,8 @@ export function FightClubPage() {
 
   function rerollShop() {
     // SAP-style: reroll is cheap (5 🍪) so it's a frequent decision.
-    const ok = useCrumbStore.getState().spend(5);
-    if (!ok) { alert("Not enough 🍪 Crumbs to reroll (5 needed)"); return; }
+    const ok = useCrumbStore.getState().spend(3);
+    if (!ok) { alert("Not enough 🍪 Crumbs to reroll (3 needed)"); return; }
     const shuffled = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 3);
     setShop(shuffled);
   }
@@ -626,12 +626,12 @@ function WorkshopView({
               }}>
                 🍪 <span>{crumbs.toLocaleString()}</span>
               </span>
-              <button onClick={onReroll} disabled={crumbs < 5} style={{
-                background: crumbs < 5 ? "#e5e7eb" : "#fff", color: crumbs < 5 ? "#aaa" : "#666",
+              <button onClick={onReroll} disabled={crumbs < 3} style={{
+                background: crumbs < 3 ? "#e5e7eb" : "#fff", color: crumbs < 3 ? "#aaa" : "#666",
                 border: "1.5px solid #e5e7eb", borderRadius: 100,
-                padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: crumbs < 5 ? "not-allowed" : "pointer",
+                padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: crumbs < 3 ? "not-allowed" : "pointer",
               }}>
-                🎲 Reroll (5 🍪)
+                🎲 Reroll (3 🍪)
               </button>
             </div>
           }

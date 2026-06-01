@@ -25,7 +25,7 @@ export const POTIONS: Record<PotionId, Potion> = {
     icon: "🧪",
     effect: "Fully restores rest cooldown",
     description: "A fizzy pink draught — wakes a Fini up instantly and clears all fatigue.",
-    price: 40,
+    price: 18,
     color: "#f472b6",
   },
   quick_snack: {
@@ -34,7 +34,7 @@ export const POTIONS: Record<PotionId, Potion> = {
     icon: "🍪",
     effect: "Removes 15 min of rest",
     description: "A buttery biscuit — small bite, big boost. Knocks 15 minutes off the cooldown.",
-    price: 12,
+    price: 5,
     color: "#fbbf24",
   },
   full_revive: {
@@ -43,7 +43,7 @@ export const POTIONS: Record<PotionId, Potion> = {
     icon: "💖",
     effect: "Restores rest + heals to max HP next battle",
     description: "A rare elixir. Wakes the Fini up AND grants +20% HP for their next battle.",
-    price: 90,
+    price: 40,
     color: "#ef4444",
   },
   xp_truffle: {
@@ -52,7 +52,7 @@ export const POTIONS: Record<PotionId, Potion> = {
     icon: "🍫",
     effect: "+20 XP instantly",
     description: "A chocolate-coated experience boost. Awards 20 XP — useful for grinding to the next level.",
-    price: 30,
+    price: 13,
     color: "#a78bfa",
   },
 };

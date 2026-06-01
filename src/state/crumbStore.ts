@@ -19,12 +19,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// SAP-style restrained economy: start with just enough for one cheap snack
-// or a couple of common items. Surviving multiple battles is the unlock —
-// after ~4 wins you can afford a rare item, after ~10 a legendary.
-const STARTING_CRUMBS = 30;
-const CRUMBS_PER_WIN  = 25;  // bigger drip on win (rewards skill)
-const CRUMBS_PER_LOSS = 10;  // smaller drip on loss (don't fully starve)
+// Super Auto Pets-pure restraint: everyone starts with the same tiny wallet.
+// Day-one you can afford a single cheap item OR a couple of rerolls — nothing
+// more. Wins drip a little, losses drip even less. The whole tension of the
+// economy is "did I spend my crumbs on the right thing this round?"
+//
+//   Start  = 10 🍪 — one common item or 3 rerolls
+//   Win    = +8 🍪 — string ~3 wins for a rare
+//   Loss   = +3 🍪 — losing streaks slowly starve you
+const STARTING_CRUMBS = 10;
+const CRUMBS_PER_WIN  = 8;
+const CRUMBS_PER_LOSS = 3;
 
 interface CrumbState {
   crumbs: number;
