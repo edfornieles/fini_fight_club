@@ -171,7 +171,14 @@ export function CryptoArenaPage() {
                         <div style={{ fontSize: 12, fontWeight: 800, color: "#111", lineHeight: 1.3, flex: 1 }}>
                           {entry.battleTitle}
                         </div>
-                        {settled ? (
+                        {/* Status chip: WON / LOST / VOIDED / SETTLING / LIVE */}
+                        {entry.status === "won" ? (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: "#15803d", padding: "1px 6px", borderRadius: 100, background: "#dcfce7", whiteSpace: "nowrap" }}>🎉 WON +{entry.result?.netProfit ?? 0}</span>
+                        ) : entry.status === "lost" ? (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: "#b91c1c", padding: "1px 6px", borderRadius: 100, background: "#fee2e2", whiteSpace: "nowrap" }}>💀 LOST {entry.result?.netProfit ?? -entry.stake}</span>
+                        ) : entry.status === "voided" ? (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: "#6d28d9", padding: "1px 6px", borderRadius: 100, background: "#f3e8ff", whiteSpace: "nowrap" }}>↩️ VOID · refunded</span>
+                        ) : settled ? (
                           <span style={{ fontSize: 9, fontWeight: 800, color: "#a855f7", padding: "1px 6px", borderRadius: 100, background: "#faf5ff", whiteSpace: "nowrap" }}>SETTLING</span>
                         ) : (
                           <span style={{ fontSize: 9, fontWeight: 800, color: "#16a34a", padding: "1px 6px", borderRadius: 100, background: "#dcfce7", whiteSpace: "nowrap" }}>● LIVE</span>

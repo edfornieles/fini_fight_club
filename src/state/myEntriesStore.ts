@@ -19,6 +19,13 @@ export interface MyEntry {
   endsAt: number;       // epoch ms — when the battle resolves
   durationMs: number;   // total battle duration (for progress bar)
   status: "open" | "won" | "lost" | "voided";
+  /** Set when the battle resolves. Payout in FINI$ (0 for losses). */
+  result?: {
+    settledAt: number;
+    payout: number;       // FINI$ paid to the user (0 if lost, stake refund if void)
+    netProfit: number;    // payout - stake (negative for losses)
+    winningSide: "A" | "B" | null;  // null = void/draw
+  };
 }
 
 interface MyEntriesState {
@@ -29,6 +36,10 @@ interface MyEntriesState {
   clearAll: () => void;
   /** Returns the user's open entry on a given battle if any. */
   getForBattle: (battleId: string) => MyEntry | undefined;
+  /** Settle an open entry. winningSide=null means void/draw (stake refunded). */
+  resolveEntry: (battleId: string, winningSide: "A" | "B" | null) => MyEntry | null;
+  /** Drop settled entries older than maxAgeMs to keep the list tidy. */
+  pruneSettled: (maxAgeMs: number) => void;
 }
 
 export const useMyEntries = create<MyEntriesState>()(
@@ -49,6 +60,33 @@ export const useMyEntries = create<MyEntriesState>()(
       remove: (battleId) => set(state => ({ entries: state.entries.filter(b => b.battleId !== battleId) })),
       clearAll: () => set({ entries: [] }),
       getForBattle: (battleId) => get().entries.find(b => b.battleId === battleId),
+      resolveEntry: (battleId, winningSide) => {
+        const entry = get().entries.find(e => e.battleId === battleId);
+        if (!entry || entry.status !== "open") return null;
+        // Payout rules: winner gets 2× stake. Void/draw refunds the stake.
+        // Loser gets nothing — stake already spent.
+        const won = winningSide !== null && winningSide === entry.side;
+        const voided = winningSide === null;
+        const payout = voided ? entry.stake : won ? entry.stake * 2 : 0;
+        const netProfit = payout - entry.stake;
+        const settled: MyEntry = {
+          ...entry,
+          status: voided ? "voided" : won ? "won" : "lost",
+          result: { settledAt: Date.now(), payout, netProfit, winningSide },
+        };
+        set(state => ({
+          entries: state.entries.map(e => e.battleId === battleId ? settled : e),
+        }));
+        return settled;
+      },
+      pruneSettled: (maxAgeMs) => {
+        const now = Date.now();
+        set(state => ({
+          entries: state.entries.filter(e =>
+            e.status === "open" || !e.result || (now - e.result.settledAt) < maxAgeMs
+          ),
+        }));
+      },
     }),
     { name: "fini-myentries-v1" }
   )
