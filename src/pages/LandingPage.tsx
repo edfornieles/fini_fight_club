@@ -1,3 +1,4 @@
+import { ExploreSection } from "../components/ExploreSection";
 import { FooterSection } from "../components/FooterSection";
 
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -71,7 +72,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ExploreSection removed from the front page — moved to a dedicated route if/when needed */}
+      <ExploreSection />
       <FooterSection />
 
       {/* Disclaimer */}
