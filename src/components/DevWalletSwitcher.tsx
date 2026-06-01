@@ -31,15 +31,23 @@ const QUICK_PICKS: { label: string; addr: string; note: string }[] = [
 function isDevModeEnabled(): boolean {
   if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
+  // Explicit opt-out via ?dev=0 still works (hides the panel for clean screenshots etc.)
+  if (params.get("dev") === "0") {
+    try { localStorage.setItem("fini_dev", "0"); } catch { /* ignore */ }
+    return false;
+  }
+  // Explicit opt-in via ?dev=1 takes priority
   if (params.get("dev") === "1") {
     try { localStorage.setItem("fini_dev", "1"); } catch { /* ignore */ }
     return true;
   }
-  if (params.get("dev") === "0") {
-    try { localStorage.removeItem("fini_dev"); } catch { /* ignore */ }
-    return false;
-  }
-  try { return localStorage.getItem("fini_dev") === "1"; } catch { return false; }
+  // Read persisted preference
+  let stored: string | null = null;
+  try { stored = localStorage.getItem("fini_dev"); } catch { /* ignore */ }
+  if (stored === "0") return false;
+  // Default: ON during closed beta so testers can play instantly without
+  // MetaMask. To hide the panel on a specific browser, visit /?dev=0
+  return true;
 }
 
 export function DevWalletSwitcher() {

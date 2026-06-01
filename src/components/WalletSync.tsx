@@ -19,7 +19,9 @@ export function WalletSync() {
   useEffect(() => {
     // In dev-impersonation mode the wallet is set manually via DevWalletSwitcher.
     // Don't let wagmi's "not connected" state wipe it.
-    const devMode = typeof window !== "undefined" && localStorage.getItem("fini_dev") === "1";
+    // Dev impersonation is ON by default during closed beta; the only way to
+    // disable it is the user setting fini_dev=0 (via /?dev=0).
+    const devMode = typeof window !== "undefined" && localStorage.getItem("fini_dev") !== "0";
     if (isConnected && address && address.toLowerCase() !== walletAddress) {
       connectWallet(address.toLowerCase());
     } else if (!isConnected && walletAddress && !devMode) {
