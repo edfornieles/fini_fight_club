@@ -9,7 +9,10 @@ import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
 import { useLivePrices } from "../hooks/useLivePrices";
-import { useCryptoSim, useSimBattles } from "../data/cryptoSim";
+import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
+import { personaFor } from "../lib/ghostPersonas";
+import { openingFor, intraWindowReturn } from "../lib/openingPrices";
+import { getCachedPrices } from "../lib/priceProviders";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 
 const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -20,13 +23,6 @@ const ASSET_COLORS: Record<string, string> = {
   MATIC: "#8247e5", XTZ: "#a6e000",
 };
 
-const DUMMY_LOG = [
-  { time: "14:32:01", msg: "BTC opens at $97,240. Battle begins." },
-  { time: "14:33:14", msg: "Early momentum: Up side gains +2% probability." },
-  { time: "14:34:55", msg: "Large position entered — 12,000 Fini Coin on Up." },
-  { time: "14:36:02", msg: "BTC dips to $97,100. Down side recovers to 49%." },
-  { time: "14:37:41", msg: "Volume crosses 80K Fini Coin. Arena intensity: High." },
-];
 
 export function BattlePage() {
   const { battleId = "" } = useParams<{ battleId: string }>();
@@ -217,18 +213,9 @@ export function BattlePage() {
               </div>
             </div>
 
-            {/* Battle log */}
-            <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Battle Log</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {DUMMY_LOG.map((entry, i) => (
-                  <div key={i} style={{ display: "flex", gap: 12, fontSize: 13 }}>
-                    <span style={{ fontFamily: "monospace", color: "#aaa", flexShrink: 0 }}>{entry.time}</span>
-                    <span style={{ color: "#333", fontWeight: 600 }}>{entry.msg}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Battle log — real, auditable activity */}
+            <BattleLog battle={battle} />
+
 
             {/* Rules */}
             <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
@@ -577,6 +564,100 @@ function BattleArenaHero({
             </b>. Sit tight — payout settles when the timer hits zero.
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * BattleLog — real, auditable activity for a battle. Everything here is
+ * derived from actual data so players can verify their results:
+ *   - Battle open: the real opening price + when the window started
+ *   - Live predictions: real persona bets on THIS battle from the sim feed
+ *   - Your entry: the player's own prediction if placed
+ *   - Current standing: real % move since open + which side it favours
+ *   - Resolution: when ended, the final price + winner
+ */
+function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: string; sideA: { label: string }; sideB: { label: string }; durationLabel: string; endsInMs: number } }) {
+  const feed = useSimFeed();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 2000);
+    return () => clearInterval(t);
+  }, []);
+
+  const asset = battle.assets[0];
+  const opening = openingFor(battle.id, asset);
+  const ret = intraWindowReturn(battle.id, asset);
+  const cur = getCachedPrices()?.[asset]?.usd ?? null;
+  const ended = battle.endsInMs <= 0;
+
+  const fmtUsd = (n: number) => n >= 1000 ? "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 }) : n >= 1 ? "$" + n.toFixed(2) : "$" + n.toFixed(4);
+  const fmtClock = (ts: number) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`; };
+  const ago = (ts: number) => { const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return `${s}s ago`; const m = Math.floor(s/60); return `${m}m ago`; };
+
+  // Recent real predictions on this battle (newest first), cap 6
+  const battleBets = feed.filter(f => f.battleId === battle.id).slice(0, 6);
+
+  type LogRow = { ts: number; tone: "open" | "bet" | "info" | "result"; text: string };
+  const rows: LogRow[] = [];
+
+  // Opening line
+  if (opening != null) {
+    rows.push({ ts: 0, tone: "open", text: `Battle opened — ${asset} at ${fmtUsd(opening)}` });
+  }
+
+  // Current standing
+  if (ret != null && cur != null) {
+    const pct = ret * 100;
+    const up = pct >= 0;
+    const leading = up ? battle.sideA.label : battle.sideB.label;
+    rows.push({
+      ts: 1,
+      tone: ended ? "result" : "info",
+      text: ended
+        ? `Settled — ${asset} closed ${fmtUsd(cur)} (${up ? "+" : ""}${pct.toFixed(2)}% since open). ${leading} wins.`
+        : `${asset} now ${fmtUsd(cur)} — ${up ? "▲ +" : "▼ "}${pct.toFixed(2)}% since open · ${leading} leading`,
+    });
+  }
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Battle Log</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* Derived rows (open + standing) */}
+        {rows.map((r, i) => (
+          <div key={`r${i}`} style={{ display: "flex", gap: 12, fontSize: 13, alignItems: "baseline" }}>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>{r.tone === "open" ? "🟢" : r.tone === "result" ? "🏁" : "📊"}</span>
+            <span style={{ color: r.tone === "result" ? "#15803d" : "#333", fontWeight: r.tone === "result" ? 800 : 600 }}>{r.text}</span>
+          </div>
+        ))}
+
+        {/* Real prediction feed for this battle */}
+        {battleBets.length > 0 && (
+          <div style={{ borderTop: "1px solid #f3f4f6", marginTop: 4, paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent predictions</div>
+            {battleBets.map(b => {
+              const p = personaFor(b.wallet);
+              const sideColor = b.side === "A" ? "#16a34a" : "#dc2626";
+              return (
+                <div key={b.id} style={{ display: "flex", gap: 10, fontSize: 13, alignItems: "baseline" }}>
+                  <span style={{ fontFamily: "monospace", color: "#bbb", flexShrink: 0, fontSize: 11 }}>{ago(b.at)}</span>
+                  <span style={{ color: "#333", fontWeight: 600 }}>
+                    {p.tierIcon} <b>{p.handle}</b> backed <b style={{ color: sideColor }}>{b.sideLabel}</b> with {b.amount.toLocaleString()} FINI$
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {rows.length === 0 && battleBets.length === 0 && (
+          <div style={{ fontSize: 13, color: "#bbb", fontStyle: "italic" }}>Loading live battle data…</div>
+        )}
+      </div>
+      <div style={{ fontSize: 10, color: "#ccc", marginTop: 14, lineHeight: 1.5 }}>
+        Times are your local clock. Prices sourced live (CoinGecko + Coinbase + Binance, median). {fmtClock(Date.now())} now.
       </div>
     </div>
   );

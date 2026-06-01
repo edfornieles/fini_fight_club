@@ -230,7 +230,7 @@ export const useCryptoSim = create<SimState>((set, get) => ({
           sideLabel,
           asset: battle.assets[0],
           amount,
-          at: 1717250000000 + lastTickId * 1000, // stable monotonic ts
+          at: Date.now(), // real wall-clock so the battle log reads rationally
         });
 
         // Drift the battle's odds toward the side that was just picked,
