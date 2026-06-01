@@ -242,28 +242,6 @@ export function ExploreSection() {
                     <NavBtn dir=">" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} />
                     <span style={{ fontSize: 12, color: "#bbb" }}>{page + 1} / {totalPages}</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginTop: 20 }}>
-                    {(["Strength", "Health", "Speed", "Defense"] as const).map((label, i) => {
-                      const vals = [view.info.baseStats.strength, view.info.baseStats.maxHealth, view.info.baseStats.speed, view.info.baseStats.defense];
-                      return (
-                        <div key={label} style={{ textAlign: "center", padding: "8px 4px", borderRadius: 12, border: "1.5px solid #eee" }}>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: "#222" }}>{vals[i]}</div>
-                          <div style={{ fontSize: 10, color: "#aaa" }}>{label}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-                    {[
-                      { label: `Default passive: ${PASSIVE_LABEL[view.info.defaultPassive]}`, bg: "#fce7f3", color: "#be185d" },
-                      { label: `Beats ${view.info.beats} (x1.1)`, bg: "#dcfce7", color: "#15803d" },
-                      { label: `Loses to ${view.info.losesTo} (x0.9)`, bg: "#fff7ed", color: "#c2410c" },
-                      { label: `Volatility ${Math.round(view.info.volatilityAffinity * 100)}%`, bg: "#f3e8ff", color: "#7c3aed" },
-                      ...(view.specials != null ? [{ label: `${view.specials} specials / ${view.mythicals} mythicals`, bg: "#fefce8", color: "#854d0e" }] : []),
-                    ].map(c => (
-                      <span key={c.label} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: c.bg, color: c.color }}>{c.label}</span>
-                    ))}
-                  </div>
                 </>
               )}
             </div>
