@@ -19,6 +19,8 @@ export interface MyEntry {
   endsAt: number;       // epoch ms — when the battle resolves
   durationMs: number;   // total battle duration (for progress bar)
   status: "open" | "won" | "lost" | "voided";
+  /** If the forecast was placed by a Strategy/Forecaster, the strategy's id. */
+  strategyId?: string;
   /** Set when the battle resolves. Payout in FINI$ (0 for losses). */
   result?: {
     settledAt: number;

@@ -18,6 +18,7 @@ import { useMyEntries } from "../state/myEntriesStore";
 import { useCryptoSim } from "../data/cryptoSim";
 import { useCoinStore } from "../state/coinStore";
 import { useNotifications } from "../state/notificationsStore";
+import { useStrategies } from "../state/strategiesStore";
 
 /**
  * Returns the winning side ("A" | "B" | null=void) for a settled battle.
@@ -58,7 +59,19 @@ export function useBattleResolver() {
           useCoinStore.getState().earn(settled.result.payout);
         }
 
-        // Toast
+        // If this forecast came from a Strategy, update the strategy's stats
+        if (entry.strategyId) {
+          const outcomeKind = settled.status === "won" ? "win" : settled.status === "lost" ? "loss" : "voided";
+          useStrategies.getState().recordOutcome(
+            entry.strategyId,
+            outcomeKind,
+            settled.result.netProfit,
+          );
+        }
+
+        // Toast (only for manually-placed entries — automated strategies are
+        // background noise, surfacing every one would be too loud)
+        if (entry.strategyId) continue;
         const pushNotif = useNotifications.getState().push;
         if (settled.status === "won") {
           pushNotif({

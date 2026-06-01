@@ -26,6 +26,7 @@ import { WalletSync } from "./components/WalletSync";
 import { DevWalletSwitcher } from "./components/DevWalletSwitcher";
 import { NotificationToasts } from "./components/NotificationToasts";
 import { useBattleResolver } from "./hooks/useBattleResolver";
+import { useStrategyExecutor } from "./hooks/useStrategyExecutor";
 import { LandingPage } from "./pages/LandingPage";
 import { CryptoArenaPage } from "./pages/CryptoArenaPage";
 import { AssetPage } from "./pages/AssetPage";
@@ -39,12 +40,14 @@ import { FiniProfilePage } from "./pages/FiniProfilePage";
 import { PlayerProfilePage } from "./pages/PlayerProfilePage";
 import { ChallengePage } from "./pages/ChallengePage";
 import { TournamentPage } from "./pages/TournamentPage";
+import { StrategiesPage } from "./pages/StrategiesPage";
 
 export default function App() {
   // Battle settlement runs globally so resolutions happen no matter where
   // the user is on the site. Toasts pop wherever the user is when an entry
   // resolves.
   useBattleResolver();
+  useStrategyExecutor();
   return (
     <>
       <WalletSync />
@@ -65,6 +68,7 @@ export default function App() {
           <Route path="/fini/:tokenId" element={<FiniProfilePage />} />
           <Route path="/p/:wallet" element={<PlayerProfilePage />} />
           <Route path="/challenge" element={<ChallengePage />} />
+          <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/tournament" element={<TournamentPage />} />
         </Routes>
       </ErrorBoundary>
