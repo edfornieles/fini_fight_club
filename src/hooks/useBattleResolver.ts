@@ -63,10 +63,13 @@ function resolveBattle(battle: BattleForResolve): ResolveOutcome {
     audit.push({ sym, opening, close, movePct });
 
     if (movePct != null) {
-      if (Math.abs(movePct) < 0.05) return { winningSide: null, audit };
-      return { winningSide: movePct > 0 ? "A" : "B", audit };
+      // The question is "Will it close HIGHER than open?" — so Up (A) wins iff
+      // close > open; anything else (down OR exactly flat) is Down (B). No tie
+      // band: a real price almost never lands on the exact cent, and if it does,
+      // "not higher" = Down by the literal question. Never void on real data.
+      return { winningSide: close! > opening! ? "A" : "B", audit };
     }
-    // No price data — fall through to sim-majority below
+    // No price data at all — fall through to sim-majority below
   }
 
   if (battle.type === "outperform" && battle.assets.length === 2) {
@@ -77,14 +80,18 @@ function resolveBattle(battle: BattleForResolve): ResolveOutcome {
     audit.push({ sym: aSym, opening: openingFor(battle.id, aSym), close: prices?.[aSym]?.usd ?? null, movePct: aRet != null ? aRet * 100 : null });
     audit.push({ sym: bSym, opening: openingFor(battle.id, bSym), close: prices?.[bSym]?.usd ?? null, movePct: bRet != null ? bRet * 100 : null });
     if (aRet != null && bRet != null) {
-      if (Math.abs(aRet - bRet) < 0.0005) return { winningSide: null, audit };
-      return { winningSide: aRet > bRet ? "A" : "B", audit };
+      // Whichever asset returned more wins. Exact equality is essentially
+      // impossible with real returns, but if it happens, break the tie
+      // deterministically (asset A by convention) rather than voiding.
+      return { winningSide: aRet >= bRet ? "A" : "B", audit };
     }
   }
 
   // Fallback: sim's % majority. Used for clanwar / abovebelow / volatility /
-  // and Up-Down battles where we never got opening prices.
-  if (Math.abs(battle.sideA.pct - battle.sideB.pct) <= 1) return { winningSide: null, audit };
+  // and price battles where we genuinely never got opening prices.
+  // Deterministic tiebreak (A) on an exact 50/50 — only void if there's truly
+  // no signal at all (shouldn't happen).
+  if (battle.sideA.pct === battle.sideB.pct) return { winningSide: "A", audit };
   return { winningSide: battle.sideA.pct > battle.sideB.pct ? "A" : "B", audit };
 }
 
