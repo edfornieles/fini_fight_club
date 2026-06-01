@@ -58,7 +58,7 @@ export function NotificationToasts() {
                   {n.title}
                 </div>
                 {n.body && (
-                  <div style={{ fontSize: 12, color: "#333", marginTop: 2, fontWeight: 500, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: "#333", marginTop: 2, fontWeight: 500, lineHeight: 1.4, whiteSpace: "pre-line" }}>
                     {n.body}
                   </div>
                 )}

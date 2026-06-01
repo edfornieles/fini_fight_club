@@ -6,6 +6,7 @@ import type { BattleType } from "../data/mockBattles";
 import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
 import { useLivePrices, fmtPrice, fmtChange } from "../hooks/useLivePrices";
 import { useMyEntries } from "../state/myEntriesStore";
+import { personaFor } from "../lib/ghostPersonas";
 
 const TOPIC_TABS = ["Trending", "Live", "Ending Soon", "High Volume"];
 const ASSET_FILTERS = ["All", "BTC", "ETH", "SOL", "DOGE", "BNB", "LINK", "AVAX"];
@@ -258,23 +259,38 @@ export function CryptoArenaPage() {
               )}
               {feed.slice(0, 30).map(entry => {
                 const sideColor = entry.side === "A" ? "#22c55e" : "#ef4444";
+                const persona = personaFor(entry.wallet);
+                const pnlColor = persona.pnl24h > 0 ? "#16a34a" : persona.pnl24h < 0 ? "#dc2626" : "#888";
                 return (
                   <Link
                     key={entry.id}
-                    to={`/battle/${entry.battleId}`}
+                    to={`/p/${entry.wallet}`}
                     style={{
                       textDecoration: "none", display: "block",
                       background: "#fafafa", borderRadius: 8, padding: "8px 10px",
                       borderLeft: `2.5px solid ${sideColor}`,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#666" }}>{entry.shortWallet}</span>
-                      <span style={{ fontSize: 10, color: sideColor, fontWeight: 800 }}>{entry.sideLabel}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+                        <span style={{ fontSize: 13 }}>{persona.tierIcon}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{persona.handle}</span>
+                      </span>
+                      <span style={{ fontSize: 10, color: sideColor, fontWeight: 800, flexShrink: 0 }}>{entry.sideLabel}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }}>
                       {entry.amount} FINI$ on <span style={{ color: "#666", fontWeight: 600 }}>{entry.asset}</span>
                     </div>
+                    {(persona.fameTag || persona.pnl24h !== 0) && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 9, fontWeight: 700 }}>
+                        {persona.fameTag && <span style={{ color: "#666" }}>{persona.fameTag}</span>}
+                        {persona.pnl24h !== 0 && (
+                          <span style={{ color: pnlColor, marginLeft: "auto", fontFamily: "monospace" }}>
+                            24h {persona.pnl24h >= 0 ? "+" : ""}{persona.pnl24h.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </Link>
                 );
               })}

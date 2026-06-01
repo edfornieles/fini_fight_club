@@ -19,19 +19,73 @@ import { useCryptoSim } from "../data/cryptoSim";
 import { useCoinStore } from "../state/coinStore";
 import { useNotifications } from "../state/notificationsStore";
 import { useStrategies } from "../state/strategiesStore";
+import { intraWindowReturn, openingFor } from "../lib/openingPrices";
+import { getCachedPrices } from "../lib/priceProviders";
+
+interface BattleForResolve {
+  id: string;
+  type: string;
+  assets: string[];
+  sideA: { pct: number };
+  sideB: { pct: number };
+}
+
+interface ResolveOutcome {
+  winningSide: "A" | "B" | null;
+  /** Per-asset price snapshot for the notification — opening, close, % move. */
+  audit: { sym: string; opening: number | null; close: number | null; movePct: number | null }[];
+}
 
 /**
- * Returns the winning side ("A" | "B" | null=void) for a settled battle.
+ * Returns the winning side AND the underlying price audit for a settled battle.
  *
- * The sim's fair-odds logic already drifts each battle toward its likely
- * winner using live-price data (for updown/outperform) and a deterministic
- * seed (for everything else). So at expiry, the side with >50% has the win.
- * Simpler than re-querying prices and handles every battle type uniformly.
+ * Up/Down  : compares current price to the snapped opening price. Side A (Up)
+ *            wins iff close > opening. No more guessing — if BTC actually
+ *            moved up, Up wins. If we don't have an opening snapshot, falls
+ *            back to the sim's final odds majority.
+ *
+ * Outperform: picks whichever asset had the bigger % return over the window.
+ *
+ * Others   : falls back to sim % majority.
+ *
+ * Tie band  ±0.05% on Up/Down → call it a draw and refund.
  */
-function decideWinner(battle: { sideA: { pct: number }; sideB: { pct: number } }): "A" | "B" | null {
-  // Margin-of-error tie band: within 1% → call it a draw and refund stakes.
-  if (Math.abs(battle.sideA.pct - battle.sideB.pct) <= 1) return null;
-  return battle.sideA.pct > battle.sideB.pct ? "A" : "B";
+function resolveBattle(battle: BattleForResolve): ResolveOutcome {
+  const audit: ResolveOutcome["audit"] = [];
+
+  if (battle.type === "updown" && battle.assets.length === 1) {
+    const sym = battle.assets[0];
+    const opening = openingFor(battle.id, sym);
+    const close = getCachedPrices()?.[sym]?.usd ?? null;
+    const movePct = opening != null && close != null && opening > 0
+      ? ((close - opening) / opening) * 100
+      : null;
+    audit.push({ sym, opening, close, movePct });
+
+    if (movePct != null) {
+      if (Math.abs(movePct) < 0.05) return { winningSide: null, audit };
+      return { winningSide: movePct > 0 ? "A" : "B", audit };
+    }
+    // No price data — fall through to sim-majority below
+  }
+
+  if (battle.type === "outperform" && battle.assets.length === 2) {
+    const aSym = battle.assets[0], bSym = battle.assets[1];
+    const aRet = intraWindowReturn(battle.id, aSym);
+    const bRet = intraWindowReturn(battle.id, bSym);
+    const prices = getCachedPrices();
+    audit.push({ sym: aSym, opening: openingFor(battle.id, aSym), close: prices?.[aSym]?.usd ?? null, movePct: aRet != null ? aRet * 100 : null });
+    audit.push({ sym: bSym, opening: openingFor(battle.id, bSym), close: prices?.[bSym]?.usd ?? null, movePct: bRet != null ? bRet * 100 : null });
+    if (aRet != null && bRet != null) {
+      if (Math.abs(aRet - bRet) < 0.0005) return { winningSide: null, audit };
+      return { winningSide: aRet > bRet ? "A" : "B", audit };
+    }
+  }
+
+  // Fallback: sim's % majority. Used for clanwar / abovebelow / volatility /
+  // and Up-Down battles where we never got opening prices.
+  if (Math.abs(battle.sideA.pct - battle.sideB.pct) <= 1) return { winningSide: null, audit };
+  return { winningSide: battle.sideA.pct > battle.sideB.pct ? "A" : "B", audit };
 }
 
 export function useBattleResolver() {
@@ -49,10 +103,26 @@ export function useBattleResolver() {
 
       for (const entry of openExpired) {
         const battle = battles.find(b => b.id === entry.battleId);
-        const winningSide: "A" | "B" | null = battle ? decideWinner(battle) : null;
+        const resolution = battle
+          ? resolveBattle(battle)
+          : { winningSide: null as "A" | "B" | null, audit: [] };
+        const { winningSide, audit } = resolution;
 
         const settled = useMyEntries.getState().resolveEntry(entry.battleId, winningSide);
         if (!settled || !settled.result) continue;
+
+        // Format a humble "price move" string for the toast body
+        const auditLine = audit
+          .filter(a => a.movePct != null && a.close != null)
+          .map(a => {
+            const arrow = (a.movePct ?? 0) >= 0 ? "▲" : "▼";
+            const sign = (a.movePct ?? 0) >= 0 ? "+" : "";
+            const closeFmt = (a.close ?? 0) >= 1
+              ? `$${(a.close ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+              : `$${(a.close ?? 0).toFixed(4)}`;
+            return `${a.sym} closed ${closeFmt} ${arrow} ${sign}${(a.movePct ?? 0).toFixed(2)}%`;
+          })
+          .join(" · ");
 
         // Route the payout based on where the forecast came from:
         //  - Strategy-placed: the strategy debited its own budget when the
@@ -80,16 +150,16 @@ export function useBattleResolver() {
             tone: "win",
             icon: "🎉",
             title: `You won ${settled.result.payout.toLocaleString()} FINI$!`,
-            body: `${entry.battleTitle} — ${entry.sideLabel} carried the day. Net +${settled.result.netProfit.toLocaleString()} FINI$.`,
+            body: `${entry.battleTitle} — ${entry.sideLabel} carried the day. Net +${settled.result.netProfit.toLocaleString()} FINI$.${auditLine ? `\n${auditLine}` : ""}`,
             href: `/battle/${entry.battleId}`,
-            durationMs: 12_000,  // wins are loud — keep on screen longer
+            durationMs: 12_000,
           });
         } else if (settled.status === "lost") {
           pushNotif({
             tone: "loss",
             icon: "💀",
             title: `Lost ${entry.stake} FINI$`,
-            body: `${entry.battleTitle} — ${entry.sideLabel} didn't carry. Tough break, run it back.`,
+            body: `${entry.battleTitle} — ${entry.sideLabel} didn't carry.${auditLine ? `\n${auditLine}` : " Tough break."}`,
             href: `/battle/${entry.battleId}`,
             durationMs: 8_000,
           });
@@ -98,7 +168,7 @@ export function useBattleResolver() {
             tone: "info",
             icon: "↩️",
             title: `Battle voided — ${entry.stake} FINI$ refunded`,
-            body: `${entry.battleTitle} — too close to call, stake back in your bankroll.`,
+            body: `${entry.battleTitle} — too close to call, stake back in your bankroll.${auditLine ? `\n${auditLine}` : ""}`,
             href: `/battle/${entry.battleId}`,
             durationMs: 8_000,
           });
