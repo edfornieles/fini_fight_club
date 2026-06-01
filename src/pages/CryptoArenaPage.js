@@ -5,7 +5,7 @@ import { BattleCard } from "../components/BattleCard";
 import { ASSET_META } from "../data/mockBattles";
 import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
 import { useLivePrices, fmtPrice, fmtChange } from "../hooks/useLivePrices";
-import { useMyBets } from "../state/myBetsStore";
+import { useMyEntries } from "../state/myEntriesStore";
 const TOPIC_TABS = ["Trending", "Live", "Ending Soon", "High Volume"];
 const ASSET_FILTERS = ["All", "BTC", "ETH", "SOL", "DOGE", "BNB", "LINK", "AVAX"];
 const TYPE_FILTERS = [
@@ -22,8 +22,8 @@ export function CryptoArenaPage() {
     const battles = useSimBattles();
     const feed = useSimFeed();
     const start = useCryptoSim(s => s.start);
-    const myBets = useMyBets(s => s.bets);
-    // Re-render every second so the My Bets progress bars tick smoothly
+    const myEntries = useMyEntries(s => s.entries);
+    // Re-render every second so the My Active Battles progress bars tick smoothly
     const [, setNowTick] = useState(0);
     useEffect(() => {
         const t = setInterval(() => setNowTick(n => n + 1), 1000);
@@ -64,16 +64,16 @@ export function CryptoArenaPage() {
                                     fontSize: 12, fontWeight: 700,
                                     background: type === f.value ? "#111" : "#fff", color: type === f.value ? "#fff" : "#666",
                                     boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                                }, children: f.label }, f.label)))] }), _jsxs("div", { style: { display: "grid", gridTemplateColumns: "1fr 280px", gap: 24, alignItems: "start" }, children: [_jsx("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }, children: filtered.map(b => _jsx(BattleCard, { battle: b }, b.id)) }), _jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 14, position: "sticky", top: 20 }, children: [myBets.length > 0 && (_jsxs("aside", { style: {
+                                }, children: f.label }, f.label)))] }), _jsxs("div", { style: { display: "grid", gridTemplateColumns: "1fr 280px", gap: 24, alignItems: "start" }, children: [_jsx("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }, children: filtered.map(b => _jsx(BattleCard, { battle: b }, b.id)) }), _jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 14, position: "sticky", top: 20 }, children: [myEntries.length > 0 && (_jsxs("aside", { style: {
                                             background: "#fff", borderRadius: 16,
                                             border: "1.5px solid #f0f0f0",
                                             padding: "16px 16px 12px",
                                             maxHeight: "40vh", overflow: "hidden",
                                             display: "flex", flexDirection: "column",
-                                        }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }, children: [_jsx("span", { style: { fontSize: 12, fontWeight: 800, color: "#111" }, children: "My Active Bets" }), _jsx("span", { style: { fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 100, background: "#fce8f3", color: "#be185d" }, children: myBets.length })] }), _jsx("div", { style: { flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }, children: myBets.map(bet => {
-                                                    const remaining = Math.max(0, bet.endsAt - Date.now());
-                                                    const elapsedPct = bet.durationMs > 0
-                                                        ? Math.min(100, ((bet.durationMs - remaining) / bet.durationMs) * 100)
+                                        }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }, children: [_jsx("span", { style: { fontSize: 12, fontWeight: 800, color: "#111" }, children: "My Active Battles" }), _jsx("span", { style: { fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 100, background: "#fce8f3", color: "#be185d" }, children: myEntries.length })] }), _jsx("div", { style: { flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }, children: myEntries.map(entry => {
+                                                    const remaining = Math.max(0, entry.endsAt - Date.now());
+                                                    const elapsedPct = entry.durationMs > 0
+                                                        ? Math.min(100, ((entry.durationMs - remaining) / entry.durationMs) * 100)
                                                         : 100;
                                                     const settled = remaining <= 0;
                                                     const fmtTime = (ms) => {
@@ -86,30 +86,30 @@ export function CryptoArenaPage() {
                                                             return `${m}m ${s % 60}s`;
                                                         return `${s}s`;
                                                     };
-                                                    const sideColor = bet.side === "A" ? "#16a34a" : "#dc2626";
-                                                    return (_jsxs(Link, { to: `/battle/${bet.battleId}`, style: {
+                                                    const sideColor = entry.side === "A" ? "#16a34a" : "#dc2626";
+                                                    return (_jsxs(Link, { to: `/battle/${entry.battleId}`, style: {
                                                             textDecoration: "none", color: "inherit",
                                                             background: "#fafafa", borderRadius: 10,
                                                             padding: "10px 12px", borderLeft: `3px solid ${sideColor}`,
                                                             display: "block",
-                                                        }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }, children: [_jsx("div", { style: { fontSize: 12, fontWeight: 800, color: "#111", lineHeight: 1.3, flex: 1 }, children: bet.battleTitle }), settled ? (_jsx("span", { style: { fontSize: 9, fontWeight: 800, color: "#a855f7", padding: "1px 6px", borderRadius: 100, background: "#faf5ff", whiteSpace: "nowrap" }, children: "SETTLING" })) : (_jsx("span", { style: { fontSize: 9, fontWeight: 800, color: "#16a34a", padding: "1px 6px", borderRadius: 100, background: "#dcfce7", whiteSpace: "nowrap" }, children: "\u25CF LIVE" }))] }), _jsxs("div", { style: { fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 6 }, children: [_jsx("span", { style: { color: sideColor, fontWeight: 800 }, children: bet.sideLabel }), _jsx("span", { style: { color: "#aaa" }, children: " \u00B7 " }), _jsxs("span", { style: { color: "#854d0e", fontWeight: 800 }, children: [bet.stake, " FINI$"] })] }), _jsx("div", { style: { height: 5, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", marginBottom: 4 }, children: _jsx("div", { style: {
+                                                        }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }, children: [_jsx("div", { style: { fontSize: 12, fontWeight: 800, color: "#111", lineHeight: 1.3, flex: 1 }, children: entry.battleTitle }), settled ? (_jsx("span", { style: { fontSize: 9, fontWeight: 800, color: "#a855f7", padding: "1px 6px", borderRadius: 100, background: "#faf5ff", whiteSpace: "nowrap" }, children: "SETTLING" })) : (_jsx("span", { style: { fontSize: 9, fontWeight: 800, color: "#16a34a", padding: "1px 6px", borderRadius: 100, background: "#dcfce7", whiteSpace: "nowrap" }, children: "\u25CF LIVE" }))] }), _jsxs("div", { style: { fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 6 }, children: [_jsx("span", { style: { color: sideColor, fontWeight: 800 }, children: entry.sideLabel }), _jsx("span", { style: { color: "#aaa" }, children: " \u00B7 " }), _jsxs("span", { style: { color: "#854d0e", fontWeight: 800 }, children: [entry.stake, " FINI$"] })] }), _jsx("div", { style: { height: 5, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", marginBottom: 4 }, children: _jsx("div", { style: {
                                                                         height: "100%", width: `${elapsedPct}%`,
                                                                         background: settled
                                                                             ? "linear-gradient(90deg, #a855f7, #7c3aed)"
                                                                             : `linear-gradient(90deg, ${sideColor}, ${sideColor}aa)`,
                                                                         borderRadius: 100, transition: "width 0.5s ease",
-                                                                    } }) }), _jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 700, color: "#888" }, children: [_jsxs("span", { children: [Math.round(elapsedPct), "% elapsed"] }), _jsx("span", { style: { fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }, children: fmtTime(remaining) })] })] }, bet.battleId));
+                                                                    } }) }), _jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 700, color: "#888" }, children: [_jsxs("span", { children: [Math.round(elapsedPct), "% elapsed"] }), _jsx("span", { style: { fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }, children: fmtTime(remaining) })] })] }, entry.battleId));
                                                 }) })] })), _jsxs("aside", { style: {
                                             background: "#fff", borderRadius: 16,
                                             border: "1.5px solid #f0f0f0",
-                                            padding: "16px 16px 8px", maxHeight: myBets.length > 0 ? "calc(60vh - 40px)" : "calc(100vh - 40px)",
+                                            padding: "16px 16px 8px", maxHeight: myEntries.length > 0 ? "calc(60vh - 40px)" : "calc(100vh - 40px)",
                                             overflow: "hidden", display: "flex", flexDirection: "column",
-                                        }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }, children: [_jsx("span", { style: { fontSize: 12, fontWeight: 800, color: "#111" }, children: "Live Activity" }), _jsx("span", { style: { fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 100, background: "#dcfce7", color: "#15803d", textTransform: "uppercase", letterSpacing: 0.5 }, children: "\u25CF Live" })] }), _jsxs("div", { style: { flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }, children: [feed.length === 0 && (_jsx("div", { style: { fontSize: 11, color: "#aaa", fontStyle: "italic", padding: "20px 0", textAlign: "center" }, children: "Waiting for bets\u2026" })), feed.slice(0, 30).map(bet => {
-                                                        const sideColor = bet.side === "A" ? "#22c55e" : "#ef4444";
-                                                        return (_jsxs(Link, { to: `/battle/${bet.battleId}`, style: {
+                                        }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }, children: [_jsx("span", { style: { fontSize: 12, fontWeight: 800, color: "#111" }, children: "Live Predictions" }), _jsx("span", { style: { fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 100, background: "#dcfce7", color: "#15803d", textTransform: "uppercase", letterSpacing: 0.5 }, children: "\u25CF Live" })] }), _jsxs("div", { style: { flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }, children: [feed.length === 0 && (_jsx("div", { style: { fontSize: 11, color: "#aaa", fontStyle: "italic", padding: "20px 0", textAlign: "center" }, children: "Waiting for activity\u2026" })), feed.slice(0, 30).map(entry => {
+                                                        const sideColor = entry.side === "A" ? "#22c55e" : "#ef4444";
+                                                        return (_jsxs(Link, { to: `/battle/${entry.battleId}`, style: {
                                                                 textDecoration: "none", display: "block",
                                                                 background: "#fafafa", borderRadius: 8, padding: "8px 10px",
                                                                 borderLeft: `2.5px solid ${sideColor}`,
-                                                            }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [_jsx("span", { style: { fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#666" }, children: bet.shortWallet }), _jsx("span", { style: { fontSize: 10, color: sideColor, fontWeight: 800 }, children: bet.sideLabel })] }), _jsxs("div", { style: { fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }, children: [bet.amount, " FINI$ on ", _jsx("span", { style: { color: "#666", fontWeight: 600 }, children: bet.asset })] })] }, bet.id));
-                                                    })] })] })] })] }), _jsx("div", { style: { marginTop: 40, padding: "16px 20px", borderRadius: 12, background: "#f3f4f6", fontSize: 11, color: "#9ca3af", lineHeight: 1.6 }, children: "Fini Coin is a non-transferable game currency with no real-world value. This is a game, not financial advice." })] })] }));
+                                                            }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [_jsx("span", { style: { fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#666" }, children: entry.shortWallet }), _jsx("span", { style: { fontSize: 10, color: sideColor, fontWeight: 800 }, children: entry.sideLabel })] }), _jsxs("div", { style: { fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }, children: [entry.amount, " FINI$ on ", _jsx("span", { style: { color: "#666", fontWeight: 600 }, children: entry.asset })] })] }, entry.id));
+                                                    })] })] })] })] }), _jsx("div", { style: { marginTop: 40, padding: "16px 20px", borderRadius: 12, background: "#f3f4f6", fontSize: 11, color: "#9ca3af", lineHeight: 1.6 }, children: "Fini Coin is a non-transferable in-game currency with no real-world value. This is a game." })] })] }));
 }

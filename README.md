@@ -57,6 +57,25 @@ scripts/          One-off node scripts (snapshot import, ghost-teams seed, …)
 public/data/      On-chain snapshot + ghost teams (committed)
 ```
 
+## Art assets
+
+The heavy art directories — `public/clan-art/`, `public/clan-finis/`, and `public/hero/` (~1.1 GB combined) — are gitignored. Download them from Google Drive:
+
+**[Art bundle (Google Drive)](https://drive.google.com/drive/folders/1TmuohNQRwDw4508CjmIEEY8ZV5tOIB1u?usp=sharing)**
+
+Unzip the contents into `public/` so the layout looks like:
+
+```
+public/
+├── clan-art/          ← 730 MB of clan battle gifs
+├── clan-finis/        ← 440 MB of per-clan sprite sheets
+├── hero/              ← 11 MB of landing-page hero clips
+├── battle-placeholder.png   (small, in the drive too — used by every battle hero)
+└── data/              (committed)
+```
+
+The app expects these paths verbatim (e.g. `<img src="/clan-art/miners.gif">`). For production deployment, mirror these under the same paths via a CDN proxy or rewrite the URLs in `src/game/wallet/toFini.ts`.
+
 ## Deployment
 
 See [SETUP.md](./SETUP.md) for the full Supabase + Vercel deployment guide.

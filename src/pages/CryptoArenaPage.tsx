@@ -5,7 +5,7 @@ import { ASSET_META } from "../data/mockBattles";
 import type { BattleType } from "../data/mockBattles";
 import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
 import { useLivePrices, fmtPrice, fmtChange } from "../hooks/useLivePrices";
-import { useMyBets } from "../state/myBetsStore";
+import { useMyEntries } from "../state/myEntriesStore";
 
 const TOPIC_TABS = ["Trending", "Live", "Ending Soon", "High Volume"];
 const ASSET_FILTERS = ["All", "BTC", "ETH", "SOL", "DOGE", "BNB", "LINK", "AVAX"];
@@ -24,8 +24,8 @@ export function CryptoArenaPage() {
   const battles = useSimBattles();
   const feed = useSimFeed();
   const start = useCryptoSim(s => s.start);
-  const myBets = useMyBets(s => s.bets);
-  // Re-render every second so the My Bets progress bars tick smoothly
+  const myEntries = useMyEntries(s => s.entries);
+  // Re-render every second so the My Active Battles progress bars tick smoothly
   const [, setNowTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setNowTick(n => n + 1), 1000);
@@ -115,8 +115,8 @@ export function CryptoArenaPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14, position: "sticky", top: 20 }}>
 
-          {/* My Active Bets — bets the user has placed, with progress to resolution */}
-          {myBets.length > 0 && (
+          {/* My Active Battles — entries the user has placed, with progress to resolution */}
+          {myEntries.length > 0 && (
             <aside style={{
               background: "#fff", borderRadius: 16,
               border: "1.5px solid #f0f0f0",
@@ -125,16 +125,16 @@ export function CryptoArenaPage() {
               display: "flex", flexDirection: "column",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#111" }}>My Active Bets</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#111" }}>My Active Battles</span>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 100, background: "#fce8f3", color: "#be185d" }}>
-                  {myBets.length}
+                  {myEntries.length}
                 </span>
               </div>
               <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-                {myBets.map(bet => {
-                  const remaining = Math.max(0, bet.endsAt - Date.now());
-                  const elapsedPct = bet.durationMs > 0
-                    ? Math.min(100, ((bet.durationMs - remaining) / bet.durationMs) * 100)
+                {myEntries.map(entry => {
+                  const remaining = Math.max(0, entry.endsAt - Date.now());
+                  const elapsedPct = entry.durationMs > 0
+                    ? Math.min(100, ((entry.durationMs - remaining) / entry.durationMs) * 100)
                     : 100;
                   const settled = remaining <= 0;
                   const fmtTime = (ms: number) => {
@@ -144,11 +144,11 @@ export function CryptoArenaPage() {
                     if (m > 0) return `${m}m ${s % 60}s`;
                     return `${s}s`;
                   };
-                  const sideColor = bet.side === "A" ? "#16a34a" : "#dc2626";
+                  const sideColor = entry.side === "A" ? "#16a34a" : "#dc2626";
                   return (
                     <Link
-                      key={bet.battleId}
-                      to={`/battle/${bet.battleId}`}
+                      key={entry.battleId}
+                      to={`/battle/${entry.battleId}`}
                       style={{
                         textDecoration: "none", color: "inherit",
                         background: "#fafafa", borderRadius: 10,
@@ -158,7 +158,7 @@ export function CryptoArenaPage() {
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
                         <div style={{ fontSize: 12, fontWeight: 800, color: "#111", lineHeight: 1.3, flex: 1 }}>
-                          {bet.battleTitle}
+                          {entry.battleTitle}
                         </div>
                         {settled ? (
                           <span style={{ fontSize: 9, fontWeight: 800, color: "#a855f7", padding: "1px 6px", borderRadius: 100, background: "#faf5ff", whiteSpace: "nowrap" }}>SETTLING</span>
@@ -167,9 +167,9 @@ export function CryptoArenaPage() {
                         )}
                       </div>
                       <div style={{ fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 6 }}>
-                        <span style={{ color: sideColor, fontWeight: 800 }}>{bet.sideLabel}</span>
+                        <span style={{ color: sideColor, fontWeight: 800 }}>{entry.sideLabel}</span>
                         <span style={{ color: "#aaa" }}> · </span>
-                        <span style={{ color: "#854d0e", fontWeight: 800 }}>{bet.stake} FINI$</span>
+                        <span style={{ color: "#854d0e", fontWeight: 800 }}>{entry.stake} FINI$</span>
                       </div>
                       <div style={{ height: 5, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", marginBottom: 4 }}>
                         <div style={{
@@ -195,23 +195,23 @@ export function CryptoArenaPage() {
           <aside style={{
             background: "#fff", borderRadius: 16,
             border: "1.5px solid #f0f0f0",
-            padding: "16px 16px 8px", maxHeight: myBets.length > 0 ? "calc(60vh - 40px)" : "calc(100vh - 40px)",
+            padding: "16px 16px 8px", maxHeight: myEntries.length > 0 ? "calc(60vh - 40px)" : "calc(100vh - 40px)",
             overflow: "hidden", display: "flex", flexDirection: "column",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: "#111" }}>Live Activity</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#111" }}>Live Predictions</span>
               <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 100, background: "#dcfce7", color: "#15803d", textTransform: "uppercase", letterSpacing: 0.5 }}>● Live</span>
             </div>
             <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
               {feed.length === 0 && (
-                <div style={{ fontSize: 11, color: "#aaa", fontStyle: "italic", padding: "20px 0", textAlign: "center" }}>Waiting for bets…</div>
+                <div style={{ fontSize: 11, color: "#aaa", fontStyle: "italic", padding: "20px 0", textAlign: "center" }}>Waiting for activity…</div>
               )}
-              {feed.slice(0, 30).map(bet => {
-                const sideColor = bet.side === "A" ? "#22c55e" : "#ef4444";
+              {feed.slice(0, 30).map(entry => {
+                const sideColor = entry.side === "A" ? "#22c55e" : "#ef4444";
                 return (
                   <Link
-                    key={bet.id}
-                    to={`/battle/${bet.battleId}`}
+                    key={entry.id}
+                    to={`/battle/${entry.battleId}`}
                     style={{
                       textDecoration: "none", display: "block",
                       background: "#fafafa", borderRadius: 8, padding: "8px 10px",
@@ -219,11 +219,11 @@ export function CryptoArenaPage() {
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#666" }}>{bet.shortWallet}</span>
-                      <span style={{ fontSize: 10, color: sideColor, fontWeight: 800 }}>{bet.sideLabel}</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#666" }}>{entry.shortWallet}</span>
+                      <span style={{ fontSize: 10, color: sideColor, fontWeight: 800 }}>{entry.sideLabel}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }}>
-                      {bet.amount} FINI$ on <span style={{ color: "#666", fontWeight: 600 }}>{bet.asset}</span>
+                      {entry.amount} FINI$ on <span style={{ color: "#666", fontWeight: 600 }}>{entry.asset}</span>
                     </div>
                   </Link>
                 );
@@ -234,7 +234,7 @@ export function CryptoArenaPage() {
         </div>
 
         <div style={{ marginTop: 40, padding: "16px 20px", borderRadius: 12, background: "#f3f4f6", fontSize: 11, color: "#9ca3af", lineHeight: 1.6 }}>
-          Fini Coin is a non-transferable game currency with no real-world value. This is a game, not financial advice.
+          Fini Coin is a non-transferable in-game currency with no real-world value. This is a game.
         </div>
       </div>
     </div>

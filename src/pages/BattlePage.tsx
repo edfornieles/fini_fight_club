@@ -5,7 +5,7 @@ import { useUIStore } from "../state/uiStore";
 import { ResolutionAuditPanel } from "../components/ResolutionAuditPanel";
 import { MOCK_INSTANCES } from "../data/mockBattleInstances";
 import { useCoinStore, fmtCoin } from "../state/coinStore";
-import { useMyBets } from "../state/myBetsStore";
+import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 
@@ -63,9 +63,9 @@ export function BattlePage() {
       const n = Number(m[1]);
       return m[2] === "h" ? n * 3_600_000 : n * 60_000;
     };
-    // Persist the bet locally so My Active Bets shows up on /crypto + survives reload.
-    const persistBet = (side: "A" | "B", stake: number) => {
-      useMyBets.getState().add({
+    // Persist the entry locally so My Active Battles shows up on /crypto + survives reload.
+    const persistEntry = (side: "A" | "B", stake: number) => {
+      useMyEntries.getState().add({
         battleId: battle.id,
         battleTitle: battle.title,
         side,
@@ -80,7 +80,7 @@ export function BattlePage() {
         battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey,
       });
       setPredictResult({ ok: true, side: r.side, stake: r.stake });
-      persistBet(r.side, r.stake);
+      persistEntry(r.side, r.stake);
       const wallet = useUIStore.getState().walletAddress;
       if (wallet) useCoinStore.getState().refresh(wallet);
     } catch (e) {
@@ -89,7 +89,7 @@ export function BattlePage() {
       const msg = e instanceof Error ? e.message : "predict_failed";
       if (msg.includes("offline") || msg.includes("Failed to fetch") || msg.includes("backend") || msg.includes("network")) {
         setPredictResult({ ok: true, side: selectedSide, stake: amount });
-        persistBet(selectedSide, amount);
+        persistEntry(selectedSide, amount);
       } else {
         // Real error (insufficient funds server-side, battle closed, etc.) —
         // refund the optimistic debit and show the message.
@@ -284,8 +284,8 @@ export function BattlePage() {
 
               {/* CTA */}
               {walletAddress ? (() => {
-                // Once a wager is placed on this battle, lock the page —
-                // you can't double-down or place more bets on the same outcome.
+                // Once an entry is placed on this battle, lock the page —
+                // you can't double-up or change your pick on the same outcome.
                 const locked = !!predictResult?.ok;
                 if (locked && predictResult?.ok) {
                   return (
@@ -302,7 +302,7 @@ export function BattlePage() {
                         }}
                       >
                         <span style={{ fontSize: 18 }}>🔒</span>
-                        Wager locked — {predictResult.stake} FINI$ on {predictResult.side === "A" ? sideA.label : sideB.label}
+                        Entry locked — {predictResult.stake} FINI$ on {predictResult.side === "A" ? sideA.label : sideB.label}
                       </button>
                       <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "#fff", border: "1.5px solid #f0f0f0", fontSize: 12, color: "#666", fontWeight: 600, lineHeight: 1.5, textAlign: "center" }}>
                         Entry placed. The outcome settles when the battle's resolution timer hits zero — sit tight.
@@ -360,7 +360,7 @@ export function BattlePage() {
               )}
 
               <div style={{ fontSize: 11, color: "#bbb", textAlign: "center", lineHeight: 1.5 }}>
-                Fini Coin is a non-transferable game currency. No real-money betting.
+                Fini Coin is a non-transferable in-game currency. No real-world value.
               </div>
             </div>
           </div>

@@ -2,15 +2,15 @@
  * Crypto Arena live activity simulation.
  *
  * Until the real Supabase backend is wired into the frontend, this module
- * fakes user activity using real Fini holder wallets from ghostTeams.json.
+ * simulates user activity using real Fini holder wallets from ghostTeams.json.
  * It maintains:
- *   - dynamic per-battle odds (drift toward the side users are betting on)
- *   - dynamic per-battle volume (incremented on each simulated bet)
- *   - a rolling feed of recent bets (wallet, side, amount, battleId)
+ *   - dynamic per-battle odds (drift toward the side users are picking)
+ *   - dynamic per-battle volume (incremented on each simulated entry)
+ *   - a rolling feed of recent predictions (wallet, side, amount, battleId)
  *
- * One tick every ~3 seconds spawns 1-3 bets across random battles. The
+ * One tick every ~3 seconds spawns 1-3 entries across random battles. The
  * effect: cards visibly shift their Up/Down % and volume numbers while the
- * page is open, and a recent-activity sidebar streams in real holder names.
+ * page is open, and a recent-predictions sidebar streams in real holder names.
  */
 import { create } from "zustand";
 import { MOCK_BATTLES } from "./mockBattles";
@@ -125,7 +125,7 @@ export const useCryptoSim = create((set, get) => ({
             if (liveBattles.length === 0)
                 return;
             // Pick a battle weighted by lateness — late-stage battles get a "burst"
-            // of bot bets, mimicking real arb pile-ons as resolution approaches.
+            // of bot activity, mimicking real arb pile-ons as resolution approaches.
             const weighted = liveBattles.map(b => {
                 const endsAt = battleEndsAt.get(b.id) ?? Date.now() + b.endsInMs;
                 const totalDur = parseDuration(b.durationLabel);
@@ -136,10 +136,10 @@ export const useCryptoSim = create((set, get) => ({
                 return { battle: b, weight: burstMultiplier, pA: fairOddsForBattle(b, endsAt) };
             });
             const totalWeight = weighted.reduce((s, w) => s + w.weight, 0);
-            // Spawn 1-3 bets this tick (more if any battle is in burst window)
+            // Spawn 1-3 entries this tick (more if any battle is in burst window)
             const anyBurst = weighted.some(w => w.weight >= 4);
-            const numBets = anyBurst ? 3 + Math.floor(Math.random() * 4) : 1 + Math.floor(Math.random() * 3);
-            const newBets = [];
+            const numEntries = anyBurst ? 3 + Math.floor(Math.random() * 4) : 1 + Math.floor(Math.random() * 3);
+            const newEntries = [];
             const battleUpdates = new Map();
             function pickWeightedBattle() {
                 let r = Math.random() * totalWeight;
@@ -150,21 +150,21 @@ export const useCryptoSim = create((set, get) => ({
                 }
                 return weighted[weighted.length - 1];
             }
-            for (let i = 0; i < numBets; i++) {
+            for (let i = 0; i < numEntries; i++) {
                 const picked = pickWeightedBattle();
                 const battle = picked.battle;
                 const fairA = picked.pA; // probability side A is correct (0..1)
                 const w = ghostWallets[Math.floor(Math.random() * ghostWallets.length)];
-                // Higher-owned wallets bet bigger
+                // Higher-owned wallets stake more
                 const baseAmount = 50 + Math.floor(Math.random() * 200);
                 const amount = baseAmount + Math.floor(Math.sqrt(w.ownedCount) * 25);
                 // Side is biased by fair odds — late-stage battles see ~95% of bots
-                // pile onto the favored side, matching arbitrage behavior IRL.
+                // pile onto the favored side, matching arbitrage behaviour IRL.
                 const side = Math.random() < fairA ? "A" : "B";
                 const sideLabel = side === "A" ? battle.sideA.label : battle.sideB.label;
                 lastTickId++;
-                newBets.push({
-                    id: `bet-${Date.now()}-${lastTickId}`,
+                newEntries.push({
+                    id: `entry-${Date.now()}-${lastTickId}`,
                     battleId: battle.id,
                     battleTitle: battle.title,
                     wallet: w.wallet,
@@ -175,7 +175,7 @@ export const useCryptoSim = create((set, get) => ({
                     amount,
                     at: 1717250000000 + lastTickId * 1000, // stable monotonic ts
                 });
-                // Drift the battle's odds toward the side that was just bet on,
+                // Drift the battle's odds toward the side that was just picked,
                 // weighted by amount / (volume + amount). Volume grows.
                 const current = battleUpdates.get(battle.id) ?? { sideA: battle.sideA.pct, sideB: battle.sideB.pct, volumeK: battle.volumeK };
                 const totalUSD = current.volumeK * 1000;
@@ -202,7 +202,7 @@ export const useCryptoSim = create((set, get) => ({
                         volumeK: u.volumeK,
                     };
                 }),
-                feed: [...newBets, ...state.feed].slice(0, 50),
+                feed: [...newEntries, ...state.feed].slice(0, 50),
             }));
         }, 2500); // tick every 2.5s — feels live but not frantic
     },

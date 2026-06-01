@@ -6,7 +6,7 @@ import { useUIStore } from "../state/uiStore";
 import { ResolutionAuditPanel } from "../components/ResolutionAuditPanel";
 import { MOCK_INSTANCES } from "../data/mockBattleInstances";
 import { useCoinStore, fmtCoin } from "../state/coinStore";
-import { useMyBets } from "../state/myBetsStore";
+import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -60,9 +60,9 @@ export function BattlePage() {
             const n = Number(m[1]);
             return m[2] === "h" ? n * 3_600_000 : n * 60_000;
         };
-        // Persist the bet locally so My Active Bets shows up on /crypto + survives reload.
-        const persistBet = (side, stake) => {
-            useMyBets.getState().add({
+        // Persist the entry locally so My Active Battles shows up on /crypto + survives reload.
+        const persistEntry = (side, stake) => {
+            useMyEntries.getState().add({
                 battleId: battle.id,
                 battleTitle: battle.title,
                 side,
@@ -77,7 +77,7 @@ export function BattlePage() {
                 battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey,
             });
             setPredictResult({ ok: true, side: r.side, stake: r.stake });
-            persistBet(r.side, r.stake);
+            persistEntry(r.side, r.stake);
             const wallet = useUIStore.getState().walletAddress;
             if (wallet)
                 useCoinStore.getState().refresh(wallet);
@@ -88,7 +88,7 @@ export function BattlePage() {
             const msg = e instanceof Error ? e.message : "predict_failed";
             if (msg.includes("offline") || msg.includes("Failed to fetch") || msg.includes("backend") || msg.includes("network")) {
                 setPredictResult({ ok: true, side: selectedSide, stake: amount });
-                persistBet(selectedSide, amount);
+                persistEntry(selectedSide, amount);
             }
             else {
                 // Real error (insufficient funds server-side, battle closed, etc.) —
@@ -138,8 +138,8 @@ export function BattlePage() {
                                                     border: "1.5px solid #e5e7eb", fontSize: 14, fontWeight: 600, color: "#111",
                                                     boxSizing: "border-box",
                                                 } })] }), _jsxs("div", { style: { background: "#f9fafb", borderRadius: 12, padding: "12px 14px", fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }, children: [_jsxs("div", { style: { display: "flex", justifyContent: "space-between", color: "#666" }, children: [_jsx("span", { children: "Stake" }), _jsxs("span", { style: { fontWeight: 700 }, children: [stake, " FINI$"] })] }), _jsxs("div", { style: { display: "flex", justifyContent: "space-between", color: "#666" }, children: [_jsx("span", { children: "Arena fee (7%)" }), _jsxs("span", { style: { fontWeight: 700 }, children: ["~", fee, " FINI$"] })] }), _jsx("div", { style: { height: 1, background: "#e5e7eb", margin: "4px 0" } }), _jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontWeight: 800, color: "#111" }, children: [_jsx("span", { children: "Max winnings" }), _jsxs("span", { children: [selectedSide ? Math.round(Number(stake) * (selectedSide === "A" ? 100 / sideA.pct : 100 / sideB.pct)) : "—", " FINI$"] })] })] }), walletAddress ? (() => {
-                                        // Once a wager is placed on this battle, lock the page —
-                                        // you can't double-down or place more bets on the same outcome.
+                                        // Once an entry is placed on this battle, lock the page —
+                                        // you can't double-up or change your pick on the same outcome.
                                         const locked = !!predictResult?.ok;
                                         if (locked && predictResult?.ok) {
                                             return (_jsxs("div", { children: [_jsxs("button", { disabled: true, style: {
@@ -149,7 +149,7 @@ export function BattlePage() {
                                                             cursor: "not-allowed",
                                                             background: "#dcfce7", color: "#15803d",
                                                             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                                        }, children: [_jsx("span", { style: { fontSize: 18 }, children: "\uD83D\uDD12" }), "Wager locked \u2014 ", predictResult.stake, " FINI$ on ", predictResult.side === "A" ? sideA.label : sideB.label] }), _jsx("div", { style: { marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "#fff", border: "1.5px solid #f0f0f0", fontSize: 12, color: "#666", fontWeight: 600, lineHeight: 1.5, textAlign: "center" }, children: "Entry placed. The outcome settles when the battle's resolution timer hits zero \u2014 sit tight." }), _jsx(Link, { to: "/crypto", style: {
+                                                        }, children: [_jsx("span", { style: { fontSize: 18 }, children: "\uD83D\uDD12" }), "Entry locked \u2014 ", predictResult.stake, " FINI$ on ", predictResult.side === "A" ? sideA.label : sideB.label] }), _jsx("div", { style: { marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "#fff", border: "1.5px solid #f0f0f0", fontSize: 12, color: "#666", fontWeight: 600, lineHeight: 1.5, textAlign: "center" }, children: "Entry placed. The outcome settles when the battle's resolution timer hits zero \u2014 sit tight." }), _jsx(Link, { to: "/crypto", style: {
                                                             display: "block", marginTop: 10, padding: "10px 14px", borderRadius: 100,
                                                             border: "1.5px solid #e5e7eb", background: "#fff",
                                                             color: "#666", fontWeight: 700, fontSize: 13,
@@ -170,7 +170,7 @@ export function BattlePage() {
                                                     width: "100%", padding: "14px 0", borderRadius: 100, border: "none",
                                                     fontSize: 15, fontWeight: 800, cursor: "pointer",
                                                     background: "#f472b6", color: "#fff",
-                                                }, children: "Connect Wallet" })] })), _jsx("div", { style: { fontSize: 11, color: "#bbb", textAlign: "center", lineHeight: 1.5 }, children: "Fini Coin is a non-transferable game currency. No real-money betting." })] }) })] }) })] }));
+                                                }, children: "Connect Wallet" })] })), _jsx("div", { style: { fontSize: 11, color: "#bbb", textAlign: "center", lineHeight: 1.5 }, children: "Fini Coin is a non-transferable in-game currency. No real-world value." })] }) })] }) })] }));
 }
 function StatusPill({ status }) {
     const styles = {
