@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { priceSeries, latestPrice } from "../lib/velocity";
 import { openingFor, intraWindowReturn, snapBattleOpening } from "../lib/openingPrices";
+import { seedHistoryFor } from "../lib/historicalPrices";
 
 interface SeriesConfig {
   asset: string;
@@ -188,16 +189,23 @@ export function LiveMarketCard({
   durationLabel: string;
 }) {
   const [, setTick] = useState(0);
+  const windowMs = parseDurationLabel(durationLabel);
   useEffect(() => {
+    // Fetch REAL recent history from CoinGecko so the graph shows a real curve
+    // immediately and the opening price is the true window-start price (not
+    // "now"). Then keep ticking for live updates.
+    for (const a of assets) {
+      seedHistoryFor(a, { battleId, windowMs }).then(() => setTick(n => n + 1));
+    }
     snapBattleOpening(battleId, assets);
     const t = setInterval(() => {
-      snapBattleOpening(battleId, assets); // idempotent — catches late price warmup
+      snapBattleOpening(battleId, assets); // idempotent — only sets if not already set
       setTick(n => n + 1);
     }, 1000);
     return () => clearInterval(t);
-  }, [battleId, assets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [battleId]);
 
-  const windowMs = parseDurationLabel(durationLabel);
   const series = assets.map(a => ({ asset: a, color: colors[a] ?? "#888" }));
 
   return (

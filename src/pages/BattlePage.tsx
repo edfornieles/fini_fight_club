@@ -9,6 +9,7 @@ import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
 import { useLivePrices } from "../hooks/useLivePrices";
+import { useCryptoSim, useSimBattles } from "../data/cryptoSim";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 
 const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -29,12 +30,19 @@ const DUMMY_LOG = [
 
 export function BattlePage() {
   const { battleId = "" } = useParams<{ battleId: string }>();
-  const battle = getBattleById(battleId);
   const { walletAddress } = useUIStore();
   // Keep the live price feed polling while on this page so the velocity tracker
   // (which powers the price graph + % readouts) has fresh data even if the user
   // landed here directly without visiting the Crypto Arena first.
   useLivePrices();
+  // Read the LIVE battle from the sim store so odds / volume / momentum update
+  // in real time (and match what /crypto shows). Boot the sim if it isn't
+  // already running (direct landing on this page). Fall back to the static
+  // seed only if the sim hasn't produced this battle yet.
+  const startSim = useCryptoSim(s => s.start);
+  useEffect(() => { startSim(); }, [startSim]);
+  const simBattles = useSimBattles();
+  const battle = simBattles.find(b => b.id === battleId) ?? getBattleById(battleId);
   const [stake, setStake] = useState("100");
   const [selectedSide, setSelectedSide] = useState<"A" | "B" | null>(null);
   const [predicting, setPredicting] = useState(false);

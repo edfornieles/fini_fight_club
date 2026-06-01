@@ -34,7 +34,7 @@ export type LivePrices = Record<string, PriceData>;
 
 const SYMBOLS: Symbol[] = ["BTC", "ETH", "SOL", "DOGE", "BNB", "LINK", "AVAX", "UNI", "MATIC", "XTZ"];
 
-const COINGECKO_IDS: Record<Symbol, string> = {
+export const COINGECKO_IDS: Record<Symbol, string> = {
   BTC: "bitcoin", ETH: "ethereum", SOL: "solana", DOGE: "dogecoin",
   BNB: "binancecoin", LINK: "chainlink", AVAX: "avalanche-2",
   UNI: "uniswap", MATIC: "polygon-ecosystem-token", XTZ: "tezos",

@@ -45,6 +45,18 @@ export function openingFor(battleId: string, asset: string): number | null {
 }
 
 /**
+ * Explicitly set an opening price — used when we fetch the REAL historical
+ * price at the battle's window start (from CoinGecko), which is more accurate
+ * than snapping "now" when the page first loads.
+ */
+export function setOpening(battleId: string, asset: string, price: number): void {
+  if (!Number.isFinite(price) || price <= 0) return;
+  const snap = snapshots.get(battleId) ?? { prices: {}, takenAt: Date.now() };
+  snap.prices[asset] = price;
+  snapshots.set(battleId, snap);
+}
+
+/**
  * Fractional intra-window return = (current - opening) / opening for an
  * asset. Positive = up since battle start, negative = down.
  * Returns null when either price is unavailable.

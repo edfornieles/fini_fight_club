@@ -39,6 +39,28 @@ export function samplesFor(symbol: string): number {
 }
 
 /**
+ * Seed the history with a batch of historical samples (e.g. from CoinGecko
+ * market_chart). Merges + dedupes by timestamp, keeps chronological order.
+ * Lets the price graph show a real curve immediately instead of waiting for
+ * live polls to accumulate.
+ */
+export function seedSamples(symbol: string, samples: { price: number; ts: number }[]): void {
+  if (samples.length === 0) return;
+  const existing = histories.get(symbol) ?? [];
+  const merged = [...existing, ...samples]
+    .filter(s => Number.isFinite(s.price) && s.price > 0)
+    .sort((a, b) => a.ts - b.ts);
+  // Dedupe near-identical timestamps (within 10s)
+  const deduped: Sample[] = [];
+  for (const s of merged) {
+    const last = deduped[deduped.length - 1];
+    if (last && Math.abs(s.ts - last.ts) < 10_000) { last.price = s.price; continue; }
+    deduped.push({ price: s.price, ts: s.ts });
+  }
+  histories.set(symbol, deduped.slice(-HISTORY_MAX));
+}
+
+/**
  * Return the {price, ts} samples for a symbol within the past windowMs,
  * oldest-first. For drawing price graphs. Returns [] when no history.
  */
