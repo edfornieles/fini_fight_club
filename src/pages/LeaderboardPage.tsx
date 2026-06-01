@@ -1,46 +1,57 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useLivePrices, fmtChange } from "../hooks/useLivePrices";
 
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ─── Mock data ────────────────────────────────────────────────────────────────
+// In production these come from server views. Today they're seeded so the page
+// has visible content; structure mirrors what the real queries will return.
 
-const TOP_FINIS = [
-  { rank: 1, tokenId: 4104, family: "BTC",  clan: "Arms of the State", wins: 546, losses: 87,  owner: "_samspike_",       avatar: null },
-  { rank: 2, tokenId: 2847, family: "ETH",  clan: "Artists",           wins: 347, losses: 102, owner: "_jorgelopez_",     avatar: null },
-  { rank: 3, tokenId: 7291, family: "SOL",  clan: "Soldiers",          wins: 321, losses: 96,  owner: "_llovd057_",       avatar: null },
-  { rank: 4, tokenId: 1062, family: "DOGE", clan: "Townspeople",       wins: 220, losses: 71,  owner: "_edfornieles_",    avatar: null },
-  { rank: 5, tokenId: 4103, family: "BTC",  clan: "Miners",            wins: 198, losses: 88,  owner: "_dollarmonopoly_", avatar: null },
-  { rank: 6, tokenId: 8801, family: "LINK", clan: "Hourly",            wins: 176, losses: 65,  owner: "_jakeyewan_",      avatar: null },
-  { rank: 7, tokenId: 3344, family: "ETH",  clan: "Twice Daily",       wins: 176, losses: 71,  owner: "_SJ_Spain_",       avatar: null },
-  { rank: 8, tokenId: 5566, family: "MATIC",clan: "Farmers",           wins: 164, losses: 78,  owner: "_market_mage_",    avatar: null },
-  { rank: 9, tokenId: 6212, family: "UNI",  clan: "Artists",           wins: 148, losses: 91,  owner: "_uniswap_labs_",   avatar: null },
-  { rank:10, tokenId: 9100, family: "XTZ",  clan: "Hourly",            wins: 132, losses: 64,  owner: "_baker_council_",  avatar: null },
+// 1. Crypto Arena — top players ranked by net FINI$ won across prediction battles.
+const CRYPTO_ARENA_TOP_PLAYERS = [
+  { rank: 1, name: "samspike",     wallet: "0x18ce6cd5c283dca2f50c8347420607a4e59716a6", netFini: 84_230, totalPredictions: 412, winRate: 0.62 },
+  { rank: 2, name: "jorgelopez",   wallet: "0x6266dbb2d202d4e246ee86d76bb2fbb9a71eafcd", netFini: 61_540, totalPredictions: 328, winRate: 0.59 },
+  { rank: 3, name: "presley",      wallet: "0x28d2d8d8780ff95d94689ce59f031cf829a41d40", netFini: 47_900, totalPredictions: 286, winRate: 0.58 },
+  { rank: 4, name: "llovd",        wallet: "0xcbbea7ec33d60db283ab79bdac9ffbfa46a83134", netFini: 32_180, totalPredictions: 241, winRate: 0.55 },
+  { rank: 5, name: "dollar.monopoly", wallet: "0x5c47c9ab05716d26d6e339eb19d2be3a0b0b097e", netFini: 28_640, totalPredictions: 218, winRate: 0.54 },
+  { rank: 6, name: "market.mage",  wallet: "0x742baddef042d6d829de8d40dc04ffbe7c5a4532", netFini: 21_410, totalPredictions: 186, winRate: 0.53 },
+  { rank: 7, name: "baker.council",wallet: "0xd3ccafe9c823b04c7d10ce6b3c1fcd0ddf3ec1fb", netFini: 16_820, totalPredictions: 154, winRate: 0.52 },
+  { rank: 8, name: "jakeyewan",    wallet: "0x57a4231d7c4f4e2c69e1ea0a8e7e9e3edf2c8e12", netFini: 12_960, totalPredictions: 138, winRate: 0.51 },
 ];
 
-const TOP_TEAMS = [
-  { rank: 1, teamName: "Volatility Cult",     owner: "_samspike_",        wins: 142, members: 3, family: "ETH" },
-  { rank: 2, teamName: "BTC Mountain",        owner: "_dani_eth",         wins: 118, members: 3, family: "BTC" },
-  { rank: 3, teamName: "Solar Flare Squad",   owner: "_0xpresley",        wins: 94,  members: 3, family: "SOL" },
-  { rank: 4, teamName: "Diamond Pawed Dogs",  owner: "_DollarMonopoly_",  wins: 81,  members: 3, family: "DOGE" },
-  { rank: 5, teamName: "Oracle Whisperers",   owner: "_llovd057_",        wins: 72,  members: 3, family: "LINK" },
-  { rank: 6, teamName: "Pastel Panic",        owner: "_market_mage_",     wins: 68,  members: 3, family: "MATIC" },
-  { rank: 7, teamName: "Liquidity Rangers",   owner: "_uniswap_labs_",    wins: 61,  members: 3, family: "UNI" },
-  { rank: 8, teamName: "Council Stew",        owner: "_baker_council_",   wins: 54,  members: 3, family: "XTZ" },
+// 2. Fight Club — best 3v3 teams by win count
+const FIGHT_CLUB_TOP_TEAMS = [
+  { rank: 1, teamName: "Volatility Cult",     owner: "samspike",       wins: 142, members: 3, family: "ETH" },
+  { rank: 2, teamName: "BTC Mountain",        owner: "dani",           wins: 118, members: 3, family: "BTC" },
+  { rank: 3, teamName: "Solar Flare Squad",   owner: "presley",        wins: 94,  members: 3, family: "SOL" },
+  { rank: 4, teamName: "Diamond Pawed Dogs",  owner: "dollar.monopoly",wins: 81,  members: 3, family: "DOGE" },
+  { rank: 5, teamName: "Oracle Whisperers",   owner: "llovd",          wins: 72,  members: 3, family: "LINK" },
+  { rank: 6, teamName: "Pastel Panic",        owner: "market.mage",    wins: 68,  members: 3, family: "MATIC" },
 ];
 
-const TOP_FAMILIES = [
-  { rank: 1, family: "BTC",  name: "BTC",     emoji: "👑", color: "#f7931a", weekWins: 1842, weekVol: 2_104_000, change24h: +3.4 },
-  { rank: 2, family: "ETH",  name: "ETH",     emoji: "🔮", color: "#627eea", weekWins: 1620, weekVol: 1_882_000, change24h: -1.2 },
-  { rank: 3, family: "SOL",  name: "SOL", emoji: "⚡", color: "#9945ff", weekWins: 1305, weekVol: 1_440_000, change24h: +5.1 },
-  { rank: 4, family: "DOGE", name: "DOGE",  emoji: "🐕", color: "#c3a634", weekWins: 1098, weekVol:   930_000, change24h: +8.6 },
-  { rank: 5, family: "BNB",  name: "BNB",     emoji: "⭕", color: "#f3ba2f", weekWins:  890, weekVol:   712_000, change24h: -0.4 },
-  { rank: 6, family: "LINK", name: "LINK",  emoji: "🔗", color: "#2a5ada", weekWins:  712, weekVol:   544_000, change24h: -2.1 },
-  { rank: 7, family: "AVAX", name: "AVAX",  emoji: "🏔", color: "#e84142", weekWins:  584, weekVol:   421_000, change24h: +1.8 },
-  { rank: 8, family: "MATIC",name: "MATIC", emoji: "🔷", color: "#8247e5", weekWins:  466, weekVol:   338_000, change24h: -3.0 },
-  { rank: 9, family: "UNI",  name: "UNI",  emoji: "🦄", color: "#ff007a", weekWins:  398, weekVol:   284_000, change24h: +2.4 },
-  { rank:10, family: "XTZ",  name: "XTZ",    emoji: "🧊", color: "#a6e000", weekWins:  302, weekVol:   196_000, change24h: -1.5 },
+// 2b. Fight Club — individual Finis ranked by total damage dealt across battles
+const FIGHT_CLUB_TOP_DAMAGE = [
+  { rank: 1, tokenId: 4104, family: "BTC",  clan: "Arms of the State", totalDamage: 124_810, kos: 312, owner: "samspike" },
+  { rank: 2, tokenId: 2847, family: "ETH",  clan: "Artists",           totalDamage:  98_220, kos: 256, owner: "jorgelopez" },
+  { rank: 3, tokenId: 7291, family: "SOL",  clan: "Soldiers",          totalDamage:  88_410, kos: 241, owner: "llovd" },
+  { rank: 4, tokenId: 1062, family: "DOGE", clan: "Townspeople",       totalDamage:  71_530, kos: 189, owner: "edfornieles" },
+  { rank: 5, tokenId: 4103, family: "BTC",  clan: "Miners",            totalDamage:  64_280, kos: 174, owner: "dollar.monopoly" },
+  { rank: 6, tokenId: 8801, family: "LINK", clan: "Hourly",            totalDamage:  58_910, kos: 161, owner: "jakeyewan" },
 ];
+
+// 3. The 10 asset families — change24h is filled from live prices when available
+const FAMILY_META: Record<string, { name: string; emoji: string; color: string }> = {
+  BTC:   { name: "BTC",   emoji: "₿", color: "#f7931a" },
+  ETH:   { name: "ETH",   emoji: "Ξ", color: "#627eea" },
+  SOL:   { name: "SOL",   emoji: "◎", color: "#9945ff" },
+  DOGE:  { name: "DOGE",  emoji: "🐕", color: "#c3a634" },
+  BNB:   { name: "BNB",   emoji: "⬡", color: "#f3ba2f" },
+  LINK:  { name: "LINK",  emoji: "🔗", color: "#2a5ada" },
+  AVAX:  { name: "AVAX",  emoji: "🏔", color: "#e84142" },
+  UNI:   { name: "UNI",   emoji: "🦄", color: "#ff007a" },
+  MATIC: { name: "MATIC", emoji: "🔷", color: "#8247e5" },
+  XTZ:   { name: "XTZ",   emoji: "🧊", color: "#a6e000" },
+};
 
 const CLAN_TINTS: Record<string, string> = {
   "Arms of the State": "#b8c8d8", "Hourly": "#c8b4a0", "Townspeople": "#d4cfa0",
@@ -48,11 +59,18 @@ const CLAN_TINTS: Record<string, string> = {
   "Miners": "#b8a890", "Farmers": "#a8b8a0",
 };
 
-type Tab = "finis" | "teams" | "families";
-
 export function LeaderboardPage() {
-  const [tab, setTab] = useState<Tab>("finis");
-  const [period, setPeriod] = useState<"week" | "month" | "alltime">("week");
+  const { prices } = useLivePrices();
+
+  // Build the 24h family ranking from live prices, sorted by % change desc.
+  const familyRanking = Object.entries(FAMILY_META)
+    .map(([sym, meta]) => ({
+      sym,
+      ...meta,
+      change24h: prices[sym]?.usd_24h_change ?? 0,
+      price: prices[sym]?.usd ?? 0,
+    }))
+    .sort((a, b) => b.change24h - a.change24h);
 
   return (
     <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
@@ -60,305 +78,280 @@ export function LeaderboardPage() {
       <div style={{ background: "#fff", borderBottom: "1px solid #f0f0f0", padding: "36px 48px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <h1 style={{ fontSize: 30, fontWeight: 900, color: "#111", margin: 0 }}>🏅 Leaderboard</h1>
-          <p style={{ fontSize: 14, color: "#888", marginTop: 6, marginBottom: 24, fontWeight: 500 }}>
+          <p style={{ fontSize: 14, color: "#888", marginTop: 6, marginBottom: 0, fontWeight: 500 }}>
             Top performers across the Fini universe — battle-tested.
           </p>
-
-          {/* Tab nav */}
-          <div style={{ display: "flex", gap: 4, background: "#f3f4f6", borderRadius: 100, padding: 4, width: "fit-content", marginBottom: 16 }}>
-            <TabBtn active={tab === "finis"}    onClick={() => setTab("finis")}>🐾 Top Finis</TabBtn>
-            <TabBtn active={tab === "teams"}    onClick={() => setTab("teams")}>⚔️ Top Teams</TabBtn>
-            <TabBtn active={tab === "families"} onClick={() => setTab("families")}>👑 Top Families</TabBtn>
-          </div>
-
-          {/* Period chips (only meaningful for families tab right now, but useful for all) */}
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["week", "month", "alltime"] as const).map(p => (
-              <button key={p} onClick={() => setPeriod(p)} style={{
-                padding: "5px 14px", borderRadius: 100, border: "none", cursor: "pointer",
-                fontSize: 12, fontWeight: 700,
-                background: period === p ? "#111" : "#fff",
-                color: period === p ? "#fff" : "#666",
-                boxShadow: period === p ? "none" : "0 1px 3px rgba(0,0,0,0.06)",
-              }}>
-                {p === "week" ? "This week" : p === "month" ? "This month" : "All-time"}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       {/* Body */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 48px" }}>
-        {tab === "finis"    && <FinisLeaderboard />}
-        {tab === "teams"    && <TeamsLeaderboard />}
-        {tab === "families" && <FamiliesLeaderboard period={period} />}
-      </div>
-    </div>
-  );
-}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 48px", display: "flex", flexDirection: "column", gap: 40 }}>
 
-// ── Top Finis ──────────────────────────────────────────────────────────────────
+        {/* ─── Section 1 — Crypto Arena ───────────────────────────────────── */}
+        <Section
+          number={1}
+          icon="🎯"
+          title="Crypto Arena Champions"
+          subtitle="Players with the highest net FINI$ won across prediction battles"
+          accent="#f472b6"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {CRYPTO_ARENA_TOP_PLAYERS.map(p => (
+              <PlayerRow key={p.rank} player={p} />
+            ))}
+          </div>
+        </Section>
 
-function FinisLeaderboard() {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 24, alignItems: "start" }}>
-      {/* Ranked list */}
-      <Card title="Most-winning Finis" subtitle="Finis with the strongest battle records">
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {TOP_FINIS.map(f => (
-            <FiniRow key={f.tokenId} fini={f} />
-          ))}
-        </div>
-      </Card>
-
-      {/* Featured Fini of the day */}
-      <div style={{ position: "sticky", top: 80, display: "flex", flexDirection: "column", gap: 16 }}>
-        <Card title="Player of the Day" subtitle="">
-          <div style={{ position: "relative" }}>
-            <div style={{
-              background: CLAN_TINTS[TOP_FINIS[0].clan] ?? "#fce8f3",
-              borderRadius: 14, height: 240,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              position: "relative", overflow: "hidden",
-            }}>
-              <img
-                src={`/clan-art/${slugify(TOP_FINIS[0].clan)}.gif`}
-                alt={TOP_FINIS[0].clan}
-                style={{ height: 200, width: "auto", objectFit: "contain" }}
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-              {/* Ribbon */}
-              <div style={{
-                position: "absolute", top: 14, right: -28,
-                transform: "rotate(28deg)",
-                background: "#fde047", color: "#854d0e",
-                padding: "5px 36px", fontSize: 11, fontWeight: 800,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-              }}>
-                Player of the day!
+        {/* ─── Section 2 — Fight Club ─────────────────────────────────────── */}
+        <Section
+          number={2}
+          icon="⚔️"
+          title="Fight Club"
+          subtitle="Top auto-battler teams and the Finis dealing the most damage"
+          accent="#a78bfa"
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            {/* Best teams */}
+            <SubCard title="Top Teams" subtitle="3v3 lineups with the most wins">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {FIGHT_CLUB_TOP_TEAMS.map(t => <TeamRow key={t.rank} team={t} />)}
               </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <RankBadge rank={1} size={28} />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: "#111" }}>Sam Spike</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>{TOP_FINIS[0].owner}</div>
-                </div>
+            </SubCard>
+
+            {/* Top damage dealers */}
+            <SubCard title="Top Damage Dealers" subtitle="Single Finis by total damage across all battles">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {FIGHT_CLUB_TOP_DAMAGE.map(d => <DamageRow key={d.rank} fini={d} />)}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#854d0e", fontWeight: 800 }}>
-                <span>🏆</span> {TOP_FINIS[0].wins} wins
+            </SubCard>
+          </div>
+        </Section>
+
+        {/* ─── Section 3 — Most Successful Family (24h) ───────────────────── */}
+        <Section
+          number={3}
+          icon="📈"
+          title="Most Successful Family · 24h"
+          subtitle="Live ranking by 24-hour price change — pulled from CoinGecko + Coinbase + Binance"
+          accent="#22c55e"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Champion banner — top mover */}
+            {familyRanking[0] && <FamilyChampionBanner family={familyRanking[0]} />}
+
+            {/* Full ranking list */}
+            <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {familyRanking.map((f, i) => <FamilyRow key={f.sym} rank={i + 1} family={f} />)}
               </div>
             </div>
           </div>
-        </Card>
+        </Section>
 
-        <Card title="How rankings work" subtitle="">
-          <ul style={{ fontSize: 12, color: "#666", lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
-            <li>Each Fini's wins/losses are tracked across all battles</li>
-            <li>Win streaks unlock cosmetic badges</li>
-            <li>Resets monthly to keep things competitive</li>
-          </ul>
-        </Card>
       </div>
     </div>
   );
 }
 
-function FiniRow({ fini }: { fini: typeof TOP_FINIS[number] }) {
+// ─── Row components ─────────────────────────────────────────────────────────
+
+function PlayerRow({ player }: { player: typeof CRYPTO_ARENA_TOP_PLAYERS[number] }) {
+  const short = `${player.wallet.slice(0, 6)}…${player.wallet.slice(-4)}`;
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 14,
-      padding: "10px 14px", borderRadius: 12,
+      padding: "12px 16px", borderRadius: 12,
       background: "#fff", border: "1.5px solid #f0f0f0",
+    }}>
+      <RankBadge rank={player.rank} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: "#111" }}>{player.name}</div>
+        <div style={{ fontSize: 11, color: "#888", fontFamily: "monospace" }}>{short}</div>
+      </div>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: "#854d0e" }}>
+          +{player.netFini.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>FINI$</span>
+        </div>
+        <div style={{ fontSize: 10, color: "#aaa" }}>
+          {player.totalPredictions} predictions · {Math.round(player.winRate * 100)}% win rate
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamRow({ team }: { team: typeof FIGHT_CLUB_TOP_TEAMS[number] }) {
+  const color = FAMILY_META[team.family]?.color ?? "#888";
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "10px 12px", borderRadius: 10,
+      background: "#fff", border: "1.5px solid #f0f0f0",
+    }}>
+      <RankBadge rank={team.rank} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>{team.teamName}</div>
+        <div style={{ fontSize: 10, color: "#888" }}>by {team.owner}</div>
+      </div>
+      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: color + "20", color }}>
+        {team.family}
+      </span>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: "#111" }}>{team.wins}</div>
+        <div style={{ fontSize: 9, color: "#888", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>wins</div>
+      </div>
+    </div>
+  );
+}
+
+function DamageRow({ fini }: { fini: typeof FIGHT_CLUB_TOP_DAMAGE[number] }) {
+  return (
+    <Link to={`/fini/${fini.tokenId}`} style={{ textDecoration: "none", color: "inherit" }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "10px 12px", borderRadius: 10,
+        background: "#fff", border: "1.5px solid #f0f0f0",
+        cursor: "pointer", transition: "background 0.12s",
+      }}
+        onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
+        onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+      >
+        <RankBadge rank={fini.rank} />
+        <div style={{
+          width: 30, height: 30, borderRadius: "50%",
+          background: CLAN_TINTS[fini.clan] ?? "#ddd",
+          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+        }}>
+          <img src={`/clan-art/${slugify(fini.clan)}.gif`} alt="" style={{ height: 26 }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>
+            #{fini.tokenId} <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 100, background: "#f3f4f6", color: "#666" }}>{fini.family}</span>
+          </div>
+          <div style={{ fontSize: 10, color: "#888" }}>{fini.clan}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 900, color: "#dc2626" }}>
+            {fini.totalDamage.toLocaleString()} <span style={{ fontSize: 9, color: "#888", fontWeight: 600 }}>DMG</span>
+          </div>
+          <div style={{ fontSize: 10, color: "#aaa" }}>{fini.kos} KOs</div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── 24h family champion banner + row ──────────────────────────────────────
+
+interface FamilyRanked { sym: string; name: string; emoji: string; color: string; change24h: number; price: number }
+
+function FamilyChampionBanner({ family }: { family: FamilyRanked }) {
+  const positive = family.change24h >= 0;
+  return (
+    <div style={{
+      background: `linear-gradient(135deg, ${family.color}22, ${family.color}08)`,
+      borderRadius: 20, padding: "24px 28px",
+      border: `1.5px solid ${family.color}40`,
+      display: "flex", alignItems: "center", gap: 20,
+    }}>
+      <div style={{
+        width: 72, height: 72, borderRadius: "50%",
+        background: family.color + "30", border: `3px solid ${family.color}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 32, flexShrink: 0,
+      }}>
+        {family.emoji}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: family.color, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
+          👑 Today's biggest mover
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: "#111" }}>{family.name}</div>
+        <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+          ${family.price > 1 ? family.price.toLocaleString("en-US", { maximumFractionDigits: 2 }) : family.price.toFixed(4)}
+          <span style={{ color: positive ? "#16a34a" : "#dc2626", fontWeight: 800, marginLeft: 10 }}>
+            {positive ? "▲" : "▼"} {fmtChange(family.change24h)}
+          </span>
+        </div>
+      </div>
+      <Link to={`/crypto/${family.sym.toLowerCase()}`} style={{
+        padding: "10px 18px", borderRadius: 100,
+        background: family.color, color: "#fff",
+        fontSize: 13, fontWeight: 800, textDecoration: "none",
+        flexShrink: 0,
+      }}>
+        View battles →
+      </Link>
+    </div>
+  );
+}
+
+function FamilyRow({ rank, family }: { rank: number; family: FamilyRanked }) {
+  const positive = family.change24h >= 0;
+  return (
+    <Link to={`/crypto/${family.sym.toLowerCase()}`} style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "8px 12px", borderRadius: 8,
+      textDecoration: "none", color: "inherit",
       transition: "background 0.12s",
     }}
       onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
-      onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
     >
-      <RankBadge rank={fini.rank} />
+      <RankBadge rank={rank} />
       <div style={{
-        width: 38, height: 38, borderRadius: "50%",
-        background: CLAN_TINTS[fini.clan] ?? "#ddd",
-        overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
-      }}>
-        <img src={`/clan-art/${slugify(fini.clan)}.gif`} alt="" style={{ height: 32, width: "auto" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        width: 28, height: 28, borderRadius: "50%",
+        background: family.color + "20", border: `1.5px solid ${family.color}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 13, flexShrink: 0,
+      }}>{family.emoji}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>{family.name}</div>
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: "#111", display: "flex", alignItems: "center", gap: 8 }}>
-          Fini #{fini.tokenId}
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 100, background: "#f3f4f6", color: "#666" }}>{fini.family}</span>
-        </div>
-        <div style={{ fontSize: 11, color: "#888" }}>{fini.clan} · owned by {fini.owner}</div>
+      <div style={{ fontSize: 12, color: "#666", fontFamily: "monospace", textAlign: "right", minWidth: 80 }}>
+        ${family.price > 1 ? family.price.toLocaleString("en-US", { maximumFractionDigits: 2 }) : family.price.toFixed(4)}
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 900, color: "#111" }}>{fini.wins} <span style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>wins</span></div>
-        <div style={{ fontSize: 10, color: "#aaa" }}>{Math.round((fini.wins / (fini.wins + fini.losses)) * 100)}% win rate</div>
+      <div style={{ fontSize: 13, color: positive ? "#16a34a" : "#dc2626", fontWeight: 800, textAlign: "right", minWidth: 70 }}>
+        {positive ? "▲" : "▼"} {fmtChange(family.change24h)}
       </div>
-    </div>
+    </Link>
   );
 }
 
-// ── Top Teams ──────────────────────────────────────────────────────────────────
+// ─── Layout helpers ────────────────────────────────────────────────────────
 
-function TeamsLeaderboard() {
-  const FAMILY_COLOR: Record<string, string> = {
-    BTC: "#f7931a", ETH: "#627eea", SOL: "#9945ff", DOGE: "#c3a634",
-    LINK: "#2a5ada", MATIC: "#8247e5", BNB: "#f3ba2f", AVAX: "#e84142",
-    UNI: "#ff007a", XTZ: "#a6e000",
-  };
+function Section({ number, icon, title, subtitle, accent, children }: {
+  number: number; icon: string; title: string; subtitle: string; accent: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card title="Top Auto-Battler Teams" subtitle="Teams with the most wins in the Fight Club">
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
-        {TOP_TEAMS.map(t => {
-          const color = FAMILY_COLOR[t.family] ?? "#888";
-          return (
-            <div key={t.rank} style={{
-              borderRadius: 16, border: "1.5px solid #f0f0f0", background: "#fff",
-              padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <RankBadge rank={t.rank} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: "#111" }}>{t.teamName}</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>by {t.owner}</div>
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: color + "20", color }}>{t.family}</span>
-              </div>
-              <div style={{ background: "#f9fafb", borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Auto-battler wins</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>{t.wins}</div>
-                </div>
-                <div style={{ fontSize: 22 }}>🏆</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
-// ── Top Families ────────────────────────────────────────────────────────────────
-
-function FamiliesLeaderboard({ period }: { period: "week" | "month" | "alltime" }) {
-  const periodLabel = period === "week" ? "this week" : period === "month" ? "this month" : "all-time";
-  const champion = TOP_FAMILIES[0];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Champion banner */}
-      <div style={{
-        background: `linear-gradient(135deg, ${champion.color}22, ${champion.color}08)`,
-        borderRadius: 20, padding: "28px 32px",
-        border: `1.5px solid ${champion.color}30`,
-        display: "flex", alignItems: "center", gap: 24, position: "relative", overflow: "hidden",
-      }}>
+    <section>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div style={{
-          width: 86, height: 86, borderRadius: "50%",
-          background: champion.color + "35", border: `3px solid ${champion.color}`,
+          width: 36, height: 36, borderRadius: "50%",
+          background: accent + "20", color: accent,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 42, flexShrink: 0,
+          fontSize: 16, fontWeight: 900, flexShrink: 0,
         }}>
-          {champion.emoji}
+          {number}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: champion.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
-            👑 Reigning champion · {periodLabel}
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: "#111", display: "flex", alignItems: "center", gap: 12 }}>
-            {champion.name}
-            <span style={{ fontSize: 13, color: champion.color, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "#fff" }}>{champion.family}</span>
-          </div>
-          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-            <strong>{champion.weekWins.toLocaleString()}</strong> arena wins · {(champion.weekVol / 1000).toFixed(0)}K FINI$ volume · {champion.change24h >= 0 ? "+" : ""}{champion.change24h}% today
-          </div>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>{icon} {title}</div>
+          <div style={{ fontSize: 12, color: "#888", fontWeight: 500, marginTop: 2 }}>{subtitle}</div>
         </div>
-        <Link to={`/crypto/${champion.family.toLowerCase()}`} style={{
-          padding: "10px 20px", borderRadius: 100,
-          background: champion.color, color: "#fff",
-          fontSize: 13, fontWeight: 800, textDecoration: "none",
-          flexShrink: 0,
-        }}>
-          Visit arena →
-        </Link>
       </div>
-
-      {/* Full ranking */}
-      <Card title={`All families ranked · ${periodLabel}`} subtitle="Crypto Arena battle performance by Fini family">
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {TOP_FAMILIES.map((f, i) => {
-            const top = TOP_FAMILIES[0].weekWins;
-            const barPct = (f.weekWins / top) * 100;
-            return (
-              <Link key={f.family} to={`/crypto/${f.family.toLowerCase()}`} style={{
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "12px 14px", borderRadius: 12,
-                background: i === 0 ? f.color + "10" : "#fff",
-                border: `1.5px solid ${i === 0 ? f.color + "30" : "#f0f0f0"}`,
-                textDecoration: "none",
-                transition: "transform 0.12s",
-              }}
-                onMouseEnter={e => (e.currentTarget.style.transform = "translateX(2px)")}
-                onMouseLeave={e => (e.currentTarget.style.transform = "")}
-              >
-                <RankBadge rank={f.rank} />
-                <div style={{
-                  width: 38, height: 38, borderRadius: "50%",
-                  background: f.color + "25", border: `2px solid ${f.color}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 18, flexShrink: 0,
-                }}>{f.emoji}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: "#111" }}>{f.name}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 100, background: f.color + "20", color: f.color }}>{f.family}</span>
-                  </div>
-                  <div style={{ height: 4, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", marginTop: 6 }}>
-                    <div style={{ height: "100%", width: `${barPct}%`, background: f.color, borderRadius: 100 }} />
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900, color: "#111" }}>{f.weekWins.toLocaleString()}</div>
-                  <div style={{ fontSize: 10, color: f.change24h >= 0 ? "#16a34a" : "#dc2626", fontWeight: 700 }}>
-                    {f.change24h >= 0 ? "▲" : "▼"} {Math.abs(f.change24h)}%
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: "8px 18px", borderRadius: 100, border: "none",
-      fontSize: 13, fontWeight: 700, cursor: "pointer",
-      background: active ? "#fff" : "transparent",
-      color: active ? "#111" : "#888",
-      boxShadow: active ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
-      transition: "all 0.15s",
-    }}>
       {children}
-    </button>
+    </section>
   );
 }
 
-function Card({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function SubCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #f0f0f0", padding: "22px 24px" }}>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: "#111" }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{subtitle}</div>}
+    <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: "18px 20px" }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>{title}</div>
+        <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{subtitle}</div>
       </div>
       {children}
     </div>
