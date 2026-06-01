@@ -31,12 +31,16 @@ const PAUSE_REASON_LABEL: Record<string, string> = {
 
 export function StrategiesPage() {
   const strategies = useStrategies(s => s.strategies);
+  const walletBalance = useCoinStore(s => s.balance);
   const [showNew, setShowNew] = useState(false);
 
   const sorted = strategies.slice().sort((a, b) => {
     if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
     return b.stats.totalForecasts - a.stats.totalForecasts;
   });
+
+  // Total currently locked inside deployed strategies (budget + saved profits)
+  const totalAllocated = strategies.reduce((sum, s) => sum + s.budget.remaining + s.budget.savedProfits, 0);
 
   return (
     <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
@@ -45,16 +49,49 @@ export function StrategiesPage() {
           <div>
             <h1 style={{ fontSize: 30, fontWeight: 900, color: "#111", margin: 0 }}>⚙️ Automated Attack</h1>
             <p style={{ fontSize: 14, color: "#888", marginTop: 6, marginBottom: 0, fontWeight: 500, maxWidth: 640 }}>
-              Deploy autonomous Forecasters that watch the Crypto Arena and place predictions automatically.
+              Deploy autonomous attacks that watch the Crypto Arena and place predictions automatically.
               Allocate budget, set stop conditions, choose compound or save mode, and let them run.
             </p>
           </div>
-          <button onClick={() => setShowNew(true)} style={{
-            background: "linear-gradient(135deg, #f472b6, #ec4899)", color: "#fff",
-            border: "none", borderRadius: 100, padding: "12px 22px",
-            fontSize: 14, fontWeight: 800, cursor: "pointer", flexShrink: 0,
-            boxShadow: "0 4px 14px rgba(244,114,182,0.30)",
-          }}>+ Deploy Forecaster</button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0 }}>
+            {/* Wallet + locked summary */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{
+                background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+                border: "1.5px solid #fbbf24",
+                borderRadius: 12, padding: "10px 16px",
+                color: "#854d0e", fontWeight: 800,
+                textAlign: "right", minWidth: 140,
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 800, color: "#92400e", textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.8 }}>Wallet</div>
+                <div style={{ fontSize: 20, fontWeight: 900 }}>
+                  🪙 {walletBalance.toLocaleString()}
+                  <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 4 }}>FINI$</span>
+                </div>
+              </div>
+              {totalAllocated > 0 && (
+                <div style={{
+                  background: "#f3f4f6",
+                  border: "1.5px solid #e5e7eb",
+                  borderRadius: 12, padding: "10px 16px",
+                  color: "#555", fontWeight: 700,
+                  textAlign: "right", minWidth: 140,
+                }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Locked in attacks</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>
+                    {totalAllocated.toLocaleString()}
+                    <span style={{ fontSize: 11, color: "#888", marginLeft: 4 }}>FINI$</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setShowNew(true)} style={{
+              background: "linear-gradient(135deg, #f472b6, #ec4899)", color: "#fff",
+              border: "none", borderRadius: 100, padding: "12px 22px",
+              fontSize: 14, fontWeight: 800, cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(244,114,182,0.30)",
+            }}>+ Deploy an Attack</button>
+          </div>
         </div>
       </div>
 
@@ -75,7 +112,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div style={{ background: "#fff", borderRadius: 24, border: "1.5px solid #f0f0f0", padding: "60px 32px", textAlign: "center" }}>
       <div style={{ fontSize: 64, marginBottom: 8 }}>🧪</div>
-      <div style={{ fontSize: 18, fontWeight: 900, color: "#111", marginBottom: 6 }}>No Forecasters deployed yet</div>
+      <div style={{ fontSize: 18, fontWeight: 900, color: "#111", marginBottom: 6 }}>No attacks deployed yet</div>
       <div style={{ fontSize: 13, color: "#666", marginBottom: 24, fontWeight: 500, maxWidth: 520, marginInline: "auto", lineHeight: 1.6 }}>
         Allocate a budget, pick a strategy template, configure your stop conditions and let it run while
         you're away. The strategy uses its OWN budget — your main wallet stays protected.
@@ -85,7 +122,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         border: "none", borderRadius: 100, padding: "12px 24px",
         fontSize: 14, fontWeight: 800, cursor: "pointer",
         boxShadow: "0 4px 14px rgba(244,114,182,0.30)",
-      }}>+ Deploy your first Forecaster</button>
+      }}>+ Deploy your first Attack</button>
     </div>
   );
 }
@@ -113,7 +150,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
       earn(r.refund);
       pushNotif({
         tone: "info", icon: "💰",
-        title: `Forecaster retired — ${r.refund.toLocaleString()} FINI$ refunded`,
+        title: `Attack retired — ${r.refund.toLocaleString()} FINI$ refunded`,
         body: `${strategy.name} returned remaining budget + saved profits to your wallet.`,
       });
     }
@@ -305,7 +342,7 @@ function DeployModal({ onClose }: { onClose: () => void }) {
     spend(result.deductFromWallet);
     pushNotif({
       tone: "info", icon: "🚀",
-      title: `Forecaster deployed`,
+      title: `Attack deployed`,
       body: `${finalName} is now live with ${budgetAllocated.toLocaleString()} FINI$ allocated.`,
       durationMs: 5000,
     });
@@ -326,7 +363,7 @@ function DeployModal({ onClose }: { onClose: () => void }) {
         boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111", margin: 0 }}>Deploy a Forecaster</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111", margin: 0 }}>Deploy an Attack</h2>
           <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: 22, color: "#888", cursor: "pointer" }}>×</button>
         </div>
 

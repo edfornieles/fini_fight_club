@@ -64,7 +64,7 @@ export function CryptoArenaPage() {
               textDecoration: "none",
               boxShadow: "0 4px 14px rgba(6,182,212,0.25)",
             }}
-              title="Deploy autonomous Forecasters that act on your behalf"
+              title="Deploy autonomous attacks that act on your behalf"
             >
               ⚙️ Automated Attack →
             </Link>
