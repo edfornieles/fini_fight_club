@@ -1,0 +1,280 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  /* Soft candy sky: peach -> lavender -> mint, layered for depth, with a
+     faint sugar-grain dot texture and a gentle centre glow + vignette. */
+  --bg-arena:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.55), transparent 38%),
+    radial-gradient(circle at 12% 16%, rgba(255, 168, 213, 0.6), transparent 40%),
+    radial-gradient(circle at 88% 10%, rgba(150, 200, 255, 0.52), transparent 38%),
+    radial-gradient(circle at 80% 86%, rgba(150, 232, 200, 0.5), transparent 42%),
+    radial-gradient(circle at 16% 90%, rgba(202, 176, 255, 0.5), transparent 44%),
+    radial-gradient(circle at 50% 110%, rgba(120, 90, 150, 0.16), transparent 55%),
+    linear-gradient(180deg, #fff7f2, #fdf2f7 60%, #f6f1ff);
+
+  /* Sugar-grain: tiny translucent dots tiled over everything for texture. */
+  --sugar:
+    radial-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    radial-gradient(rgba(180, 140, 220, 0.07) 1px, transparent 1.4px) 11px 11px / 22px 22px;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  background: var(--bg-arena);
+  background-attachment: fixed;
+  font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  color: #534261;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Sugar-grain texture overlay — sits behind all content, no interaction. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--sugar);
+  opacity: 0.5;
+  mix-blend-mode: soft-light;
+}
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Component styles live in the components layer so Tailwind UTILITIES
+   (e.g. `fixed`, `relative`, `rounded-*`) always override them. */
+@layer components {
+  .font-display {
+    font-family: "Fredoka", "Baloo 2", ui-sans-serif, system-ui;
+    letter-spacing: 0.01em;
+  }
+
+  /* Gradient hero text. */
+  .text-gradient {
+    background: linear-gradient(100deg, #ff7bbd 0%, #b07eff 55%, #7cc8ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ───────────────────────── Kawaii card system ─────────────────────── */
+  .glass,
+  .kcard {
+    position: relative;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 248, 252, 0.94));
+    -webkit-backdrop-filter: blur(8px) saturate(1.05);
+    backdrop-filter: blur(8px) saturate(1.05);
+    border: 1.5px solid rgba(255, 255, 255, 0.9);
+    border-radius: 28px;
+    /* Layered: soft ambient + lifted key + faint coloured glow, plus a crisp
+       inner top highlight that gives the jelly/candy sheen. */
+    box-shadow:
+      0 1px 0 1px rgba(255, 255, 255, 0.6) inset,
+      0 12px 30px -14px rgba(150, 110, 190, 0.55),
+      0 2px 8px -4px rgba(150, 110, 190, 0.2),
+      0 0 0 1px rgba(231, 215, 240, 0.7);
+  }
+
+  .kcard-soft {
+    background: linear-gradient(180deg, rgba(255, 250, 253, 0.95), rgba(255, 244, 250, 0.82));
+    border: 1.5px solid rgba(255, 255, 255, 0.75);
+    border-radius: 20px;
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      0 6px 16px -10px rgba(150, 110, 190, 0.3);
+  }
+
+  .label-soft {
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 800;
+    color: #a08fb8;
+    font-family: "Fredoka", ui-sans-serif, system-ui;
+  }
+
+  .kdivider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(185, 140, 255, 0.28), transparent);
+    border: none;
+  }
+
+  /* ───────────────────────── Kawaii buttons ─────────────────────────── */
+  .kbtn {
+    position: relative;
+    font-family: "Fredoka", ui-sans-serif, system-ui;
+    font-weight: 600;
+    border-radius: 999px;
+    transition:
+      transform 0.13s cubic-bezier(0.34, 1.56, 0.64, 1),
+      filter 0.15s ease,
+      box-shadow 0.15s ease;
+    border: none;
+    cursor: pointer;
+    background-clip: padding-box;
+  }
+  /* Glossy top highlight shared by every button. */
+  .kbtn::after {
+    content: "";
+    position: absolute;
+    inset: 2px 2px 50% 2px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
+    pointer-events: none;
+  }
+  .kbtn:hover {
+    filter: brightness(1.05) saturate(1.04);
+    transform: translateY(-1.5px);
+  }
+  .kbtn:active {
+    transform: translateY(2px) scale(0.975);
+  }
+  .kbtn:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px #fff,
+      0 0 0 5.5px rgba(176, 126, 255, 0.6);
+  }
+  .kbtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    filter: grayscale(0.2);
+  }
+
+  .kbtn-primary {
+    background: linear-gradient(180deg, #ffa6d4, #ff72ba);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(190, 60, 130, 0.35);
+    box-shadow: 0 5px 0 0 #e85fa6, 0 14px 22px -8px rgba(255, 123, 189, 0.75);
+  }
+  .kbtn-primary:active {
+    box-shadow: 0 1px 0 0 #e85fa6;
+  }
+  .kbtn-mint {
+    background: linear-gradient(180deg, #7ee9ba, #45cf97);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(30, 140, 100, 0.3);
+    box-shadow: 0 5px 0 0 #2fb886, 0 14px 22px -8px rgba(77, 210, 154, 0.65);
+  }
+  .kbtn-mint:active {
+    box-shadow: 0 1px 0 0 #2fb886;
+  }
+  .kbtn-gold {
+    background: linear-gradient(180deg, #ffe49a, #ffcb52);
+    color: #7a5a1e;
+    box-shadow: 0 5px 0 0 #e6ab2e, 0 14px 22px -8px rgba(255, 207, 92, 0.65);
+  }
+  .kbtn-gold:active {
+    box-shadow: 0 1px 0 0 #e6ab2e;
+  }
+  .kbtn-grape {
+    background: linear-gradient(180deg, #cda4ff, #ad7bff);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(110, 70, 180, 0.3);
+    box-shadow: 0 5px 0 0 #9560e6, 0 14px 22px -8px rgba(176, 126, 255, 0.65);
+  }
+  .kbtn-grape:active {
+    box-shadow: 0 1px 0 0 #9560e6;
+  }
+  .kbtn-ghost {
+    background: linear-gradient(180deg, #ffffff, #fdf7fb);
+    color: #7a6a8c;
+    border: 1.5px solid #efe2f3;
+    box-shadow: 0 4px 0 0 #ece0f1, 0 8px 16px -10px rgba(150, 110, 190, 0.3);
+  }
+  .kbtn-ghost::after {
+    inset: 1.5px 1.5px 55% 1.5px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  }
+  .kbtn-ghost:active {
+    box-shadow: 0 1px 0 0 #ece0f1;
+  }
+
+  /* Little pill chip — soft gradient + crisp inner highlight. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    padding: 3px 11px;
+    font-weight: 800;
+    font-size: 12px;
+    font-family: "Fredoka", ui-sans-serif, system-ui;
+    box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.55) inset;
+  }
+
+  /* Tamagotchi-style readout — a nod to the original LED finiliar. */
+  .lcd {
+    background: linear-gradient(180deg, #e8fff4, #d3f6e6);
+    border: 2px solid #b8ecd4;
+    border-radius: 14px;
+    box-shadow:
+      inset 0 2px 6px rgba(60, 180, 130, 0.2),
+      inset 0 0 14px rgba(120, 220, 180, 0.18);
+    color: #2f9e74;
+    font-family: "Fredoka", ui-monospace, monospace;
+    font-weight: 600;
+    text-shadow: 0 0 6px rgba(80, 200, 150, 0.35);
+  }
+
+  .sticker {
+    box-shadow: 0 0 0 3px #fff, 0 6px 16px -4px rgba(150, 110, 180, 0.55);
+  }
+
+  .kglow {
+    box-shadow: 0 0 36px -6px rgba(255, 143, 199, 0.5), 0 0 60px -10px rgba(176, 126, 255, 0.35);
+  }
+
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: shimmer 2.6s ease-in-out infinite;
+  }
+}
+
+/* Scrollbar (outside layers — pseudo-elements, no utility conflict). */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(199, 157, 255, 0.6), rgba(255, 143, 199, 0.55));
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::before {
+    animation: none;
+  }
+}

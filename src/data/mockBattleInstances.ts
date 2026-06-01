@@ -1,0 +1,258 @@
+/**
+ * Mock resolved battle instances — each carries a complete server-side audit
+ * trail. In production these come from the database, never from the client.
+ */
+import type { BattleInstance, BattleTemplate } from "../game/priceIntegrity";
+
+export const MOCK_TEMPLATES: Record<string, BattleTemplate> = {
+  "btc-updown-hourly": {
+    templateId: "btc-updown-hourly",
+    name: "BTC Up or Down Hourly",
+    questionTemplate: "Will BTC close higher than its opening price this hour?",
+    primaryPriceSource: "coingecko_v3",
+    backupPriceSources: ["coinbase_spot", "binance_spot"],
+    startPriceRule: "at_battle_start",
+    endPriceRule: "at_battle_end",
+    stalePriceThresholdSeconds: 30,
+    maxAllowedDeviationBps: 50,
+    fallbackBehavior: "manual_review",
+    manualReviewBehavior: "hold_entries",
+    voidBehavior: "return_all_entries",
+    entryCutoffSeconds: 30,
+    resolutionFormula: "If officialEndPrice > officialStartPrice → Side A (Up) wins. Otherwise Side B (Down) wins.",
+  },
+  "eth-sol-outperform": {
+    templateId: "eth-sol-outperform",
+    name: "Outperform: ETH vs SOL",
+    questionTemplate: "Will ETH outperform SOL over the battle window?",
+    primaryPriceSource: "coingecko_v3",
+    backupPriceSources: ["coinbase_spot", "kraken_spot"],
+    startPriceRule: "at_battle_start",
+    endPriceRule: "at_battle_end",
+    stalePriceThresholdSeconds: 30,
+    maxAllowedDeviationBps: 75,
+    fallbackBehavior: "manual_review",
+    manualReviewBehavior: "hold_entries",
+    voidBehavior: "return_all_entries",
+    entryCutoffSeconds: 30,
+    resolutionFormula: "Compute pctChange(ETH) and pctChange(SOL) over the window. Higher % change wins.",
+  },
+};
+
+export const MOCK_INSTANCES: Record<string, BattleInstance> = {
+  // ── Resolved cleanly ──────────────────────────────────────────────────────────
+  "btc-updown-hourly-resolved": {
+    battleId: "btc-updown-hourly-resolved",
+    templateId: "btc-updown-hourly",
+    asset: "BTC",
+    question: "Will BTC close higher than its opening price this hour?",
+    sideALabel: "Up",
+    sideBLabel: "Down",
+
+    officialStartPrice: 97240.00,
+    officialStartPriceSource: "coingecko_v3",
+    officialStartTimestamp: "2026-05-31T13:00:02.418Z",
+    startBackupPriceChecks: [
+      { source: "coinbase_spot",  price: 97238.50, fetchedAt: "2026-05-31T13:00:03.102Z", latencyMs: 84 },
+      { source: "binance_spot",   price: 97241.20, fetchedAt: "2026-05-31T13:00:03.344Z", latencyMs: 91 },
+    ],
+    startDeviationReport: {
+      primaryPrice: 97240.00,
+      backupPrices: [
+        { source: "coinbase_spot", price: 97238.50 },
+        { source: "binance_spot",  price: 97241.20 },
+      ],
+      maxDeviationBps: 1.2,
+      withinThreshold: true,
+    },
+
+    officialEndPrice: 97418.75,
+    officialEndPriceSource: "coingecko_v3",
+    officialEndTimestamp: "2026-05-31T14:00:01.811Z",
+    endBackupPriceChecks: [
+      { source: "coinbase_spot",  price: 97416.00, fetchedAt: "2026-05-31T14:00:02.509Z", latencyMs: 78 },
+      { source: "binance_spot",   price: 97420.10, fetchedAt: "2026-05-31T14:00:02.741Z", latencyMs: 85 },
+    ],
+    endDeviationReport: {
+      primaryPrice: 97418.75,
+      backupPrices: [
+        { source: "coinbase_spot", price: 97416.00 },
+        { source: "binance_spot",  price: 97420.10 },
+      ],
+      maxDeviationBps: 2.8,
+      withinThreshold: true,
+    },
+
+    resolutionFormula: "If officialEndPrice > officialStartPrice → Side A (Up) wins. Otherwise Side B (Down) wins.",
+    resolutionCalculation: "$97,418.75 > $97,240.00 → BTC rose $178.75 (+0.18%) → Up wins",
+    winningSide: "A",
+    resolutionStatus: "resolved",
+    resolutionAuditLog: [
+      { timestamp: "2026-05-31T13:00:02.418Z", event: "Battle started — official start price recorded", detail: "$97,240.00 via coingecko_v3 (deviation 1.2bps — within 50bps limit)", actor: "system" },
+      { timestamp: "2026-05-31T13:29:31.000Z", event: "Entry cutoff enforced — no new entries accepted after this point", actor: "system" },
+      { timestamp: "2026-05-31T14:00:01.811Z", event: "Battle ended — official end price recorded", detail: "$97,418.75 via coingecko_v3 (deviation 2.8bps — within 50bps limit)", actor: "system" },
+      { timestamp: "2026-05-31T14:00:01.920Z", event: "Resolution formula applied", detail: "$97,418.75 > $97,240.00 → Up wins", actor: "system" },
+      { timestamp: "2026-05-31T14:00:02.100Z", event: "Payouts queued via Fini Coin ledger — idempotency key b7f3a9d2", actor: "system" },
+      { timestamp: "2026-05-31T14:00:02.388Z", event: "Resolution complete — status set to resolved", actor: "system" },
+    ],
+  },
+
+  // ── Resolved: outperform battle ───────────────────────────────────────────────
+  "eth-sol-outperform-resolved": {
+    battleId: "eth-sol-outperform-resolved",
+    templateId: "eth-sol-outperform",
+    asset: "ETH",
+    question: "Will ETH outperform SOL over the next 2 hours?",
+    sideALabel: "ETH",
+    sideBLabel: "SOL",
+
+    officialStartPrice: 3441.00,   // ETH start; SOL start recorded separately below
+    officialStartPriceSource: "coingecko_v3",
+    officialStartTimestamp: "2026-05-31T12:00:01.204Z",
+    startBackupPriceChecks: [
+      { source: "coinbase_spot", price: 3440.50, fetchedAt: "2026-05-31T12:00:01.800Z", latencyMs: 72 },
+      { source: "kraken_spot",   price: 3441.80, fetchedAt: "2026-05-31T12:00:02.011Z", latencyMs: 88 },
+    ],
+    startDeviationReport: {
+      primaryPrice: 3441.00,
+      backupPrices: [
+        { source: "coinbase_spot", price: 3440.50 },
+        { source: "kraken_spot",   price: 3441.80 },
+      ],
+      maxDeviationBps: 2.3,
+      withinThreshold: true,
+    },
+
+    officialEndPrice: 3481.22,
+    officialEndPriceSource: "coingecko_v3",
+    officialEndTimestamp: "2026-05-31T14:00:01.599Z",
+    endBackupPriceChecks: [
+      { source: "coinbase_spot", price: 3480.90, fetchedAt: "2026-05-31T14:00:02.101Z", latencyMs: 79 },
+      { source: "kraken_spot",   price: 3481.55, fetchedAt: "2026-05-31T14:00:02.330Z", latencyMs: 91 },
+    ],
+    endDeviationReport: {
+      primaryPrice: 3481.22,
+      backupPrices: [
+        { source: "coinbase_spot", price: 3480.90 },
+        { source: "kraken_spot",   price: 3481.55 },
+      ],
+      maxDeviationBps: 1.0,
+      withinThreshold: true,
+    },
+
+    resolutionFormula: "Compute pctChange(ETH) and pctChange(SOL) over the window. Higher % change wins.",
+    resolutionCalculation: "ETH: ($3,481.22 − $3,441.00) / $3,441.00 = +1.169% | SOL: ($189.40 − $182.00) / $182.00 = +4.066% → SOL outperformed ETH → Side B (SOL) wins",
+    winningSide: "B",
+    resolutionStatus: "resolved",
+    resolutionAuditLog: [
+      { timestamp: "2026-05-31T12:00:01.204Z", event: "Battle started — ETH start price $3,441.00 and SOL start price $182.00 recorded", detail: "ETH deviation 2.3bps, SOL deviation 1.8bps — both within 75bps limit", actor: "system" },
+      { timestamp: "2026-05-31T13:29:31.000Z", event: "Entry cutoff enforced", actor: "system" },
+      { timestamp: "2026-05-31T14:00:01.599Z", event: "End prices recorded — ETH $3,481.22 / SOL $189.40", detail: "ETH deviation 1.0bps, SOL deviation 2.1bps — both within threshold", actor: "system" },
+      { timestamp: "2026-05-31T14:00:01.710Z", event: "Resolution formula applied", detail: "ETH +1.169% vs SOL +4.066% — SOL wins", actor: "system" },
+      { timestamp: "2026-05-31T14:00:01.890Z", event: "Payouts queued — idempotency key c8a4b1e7", actor: "system" },
+      { timestamp: "2026-05-31T14:00:02.044Z", event: "Resolution complete", actor: "system" },
+    ],
+  },
+
+  // ── Manual review — price feeds diverged ─────────────────────────────────────
+  "btc-above-100k-review": {
+    battleId: "btc-above-100k-review",
+    templateId: "btc-updown-hourly",
+    asset: "BTC",
+    question: "Will BTC be above $100,000 at daily close?",
+    sideALabel: "Yes",
+    sideBLabel: "No",
+
+    officialStartPrice: 97240.00,
+    officialStartPriceSource: "coingecko_v3",
+    officialStartTimestamp: "2026-05-31T00:00:01.004Z",
+    startBackupPriceChecks: [
+      { source: "coinbase_spot", price: 97241.00, fetchedAt: "2026-05-31T00:00:01.500Z", latencyMs: 66 },
+      { source: "binance_spot",  price: 97239.80, fetchedAt: "2026-05-31T00:00:01.720Z", latencyMs: 74 },
+    ],
+    startDeviationReport: {
+      primaryPrice: 97240.00,
+      backupPrices: [
+        { source: "coinbase_spot", price: 97241.00 },
+        { source: "binance_spot",  price: 97239.80 },
+      ],
+      maxDeviationBps: 1.0,
+      withinThreshold: true,
+    },
+
+    officialEndPrice: null,
+    officialEndPriceSource: null,
+    officialEndTimestamp: null,
+    endBackupPriceChecks: [
+      { source: "coinbase_spot", price: 99870.00, fetchedAt: "2026-05-31T23:59:58.000Z", latencyMs: 81 },
+      { source: "binance_spot",  price: 96120.50, fetchedAt: "2026-05-31T23:59:59.200Z", latencyMs: 94 },
+    ],
+    endDeviationReport: {
+      primaryPrice: 99870.00,
+      backupPrices: [
+        { source: "coinbase_spot", price: 99870.00 },
+        { source: "binance_spot",  price: 96120.50 },
+      ],
+      maxDeviationBps: 376.1,
+      withinThreshold: false,
+    },
+
+    resolutionFormula: "If officialEndPrice > $100,000 → Side A (Yes) wins. Otherwise Side B (No) wins.",
+    resolutionCalculation: "Cannot compute — end price integrity check failed",
+    winningSide: null,
+    resolutionStatus: "manual_review",
+    voidReason: undefined,
+    resolutionAuditLog: [
+      { timestamp: "2026-05-31T00:00:01.004Z", event: "Battle started — start price $97,240.00 recorded", detail: "All sources within 1.0bps — integrity confirmed", actor: "system" },
+      { timestamp: "2026-05-31T23:29:31.000Z", event: "Entry cutoff enforced", actor: "system" },
+      { timestamp: "2026-05-31T23:59:58.000Z", event: "End price snapshot attempted — FAILED", detail: "CoinGecko primary timed out (no response after 30s). Coinbase: $99,870 / Binance: $96,120.50 — deviation 376.1bps exceeds 50bps limit. Auto-resolution blocked.", actor: "system" },
+      { timestamp: "2026-06-01T00:00:01.000Z", event: "Battle marked as manual_review — entries held", detail: "Admin notification sent. No payouts until resolved by admin.", actor: "system" },
+    ],
+  },
+
+  // ── Voided — primary feed offline ────────────────────────────────────────────
+  "sol-updown-15m-voided": {
+    battleId: "sol-updown-15m-voided",
+    templateId: "btc-updown-hourly",
+    asset: "SOL",
+    question: "Will SOL close higher than its opening price in this 15-minute window?",
+    sideALabel: "Up",
+    sideBLabel: "Down",
+
+    officialStartPrice: 182.00,
+    officialStartPriceSource: "coingecko_v3",
+    officialStartTimestamp: "2026-05-31T11:00:01.900Z",
+    startBackupPriceChecks: [
+      { source: "coinbase_spot", price: 181.98, fetchedAt: "2026-05-31T11:00:02.300Z", latencyMs: 61 },
+      { source: "binance_spot",  price: 182.02, fetchedAt: "2026-05-31T11:00:02.510Z", latencyMs: 71 },
+    ],
+    startDeviationReport: {
+      primaryPrice: 182.00,
+      backupPrices: [
+        { source: "coinbase_spot", price: 181.98 },
+        { source: "binance_spot",  price: 182.02 },
+      ],
+      maxDeviationBps: 1.1,
+      withinThreshold: true,
+    },
+
+    officialEndPrice: null,
+    officialEndPriceSource: null,
+    officialEndTimestamp: null,
+    endBackupPriceChecks: [],
+    endDeviationReport: null,
+
+    resolutionFormula: "If officialEndPrice > officialStartPrice → Side A (Up) wins. Otherwise Side B (Down) wins.",
+    resolutionCalculation: "Cannot compute — all price sources offline at end of battle",
+    winningSide: null,
+    resolutionStatus: "voided",
+    voidReason: "All three price sources (CoinGecko, Coinbase, Binance) returned errors or timed out at battle end. Cannot determine a fair result. All Fini Coin entries returned in full.",
+    resolutionAuditLog: [
+      { timestamp: "2026-05-31T11:00:01.900Z", event: "Battle started — SOL start price $182.00 recorded", detail: "All sources within 1.1bps", actor: "system" },
+      { timestamp: "2026-05-31T11:14:31.000Z", event: "Entry cutoff enforced", actor: "system" },
+      { timestamp: "2026-05-31T11:15:02.000Z", event: "End price snapshot attempted — all sources failed", detail: "CoinGecko: timeout. Coinbase: 503 Service Unavailable. Binance: timeout. No backup data available.", actor: "system" },
+      { timestamp: "2026-05-31T11:15:02.100Z", event: "Battle voided — all Fini Coin entries returned", detail: "Return idempotency key: v9d2c5f1. Void reason recorded in audit log.", actor: "system" },
+      { timestamp: "2026-05-31T11:15:02.400Z", event: "Full entry refunds queued via ledger", actor: "system" },
+    ],
+  },
+};

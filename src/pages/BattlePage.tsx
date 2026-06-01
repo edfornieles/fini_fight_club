@@ -1,0 +1,559 @@
+import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { getBattleById, ASSET_META } from "../data/mockBattles";
+import { useUIStore } from "../state/uiStore";
+import { ResolutionAuditPanel } from "../components/ResolutionAuditPanel";
+import { MOCK_INSTANCES } from "../data/mockBattleInstances";
+import { useCoinStore, fmtCoin } from "../state/coinStore";
+import { useMyBets } from "../state/myBetsStore";
+import { api } from "../lib/api";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+
+const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
+
+const ASSET_COLORS: Record<string, string> = {
+  BTC: "#f7931a", ETH: "#627eea", SOL: "#9945ff", DOGE: "#c3a634",
+  LINK: "#2a5ada", UNI: "#ff007a", AVAX: "#e84142", BNB: "#f3ba2f",
+  MATIC: "#8247e5", XTZ: "#a6e000",
+};
+
+const DUMMY_LOG = [
+  { time: "14:32:01", msg: "BTC opens at $97,240. Battle begins." },
+  { time: "14:33:14", msg: "Early momentum: Up side gains +2% probability." },
+  { time: "14:34:55", msg: "Large position entered — 12,000 Fini Coin on Up." },
+  { time: "14:36:02", msg: "BTC dips to $97,100. Down side recovers to 49%." },
+  { time: "14:37:41", msg: "Volume crosses 80K Fini Coin. Arena intensity: High." },
+];
+
+export function BattlePage() {
+  const { battleId = "" } = useParams<{ battleId: string }>();
+  const battle = getBattleById(battleId);
+  const { walletAddress } = useUIStore();
+  const [stake, setStake] = useState("100");
+  const [selectedSide, setSelectedSide] = useState<"A" | "B" | null>(null);
+  const [predicting, setPredicting] = useState(false);
+  const [predictResult, setPredictResult] = useState<{ ok: true; side: "A" | "B"; stake: number } | { ok: false; error: string } | null>(null);
+  const { openConnectModal } = useConnectModal();
+
+  async function placePrediction() {
+    if (!selectedSide || !battle) return;
+    setPredicting(true);
+    setPredictResult(null);
+    const amount = Math.round(Number(stake));
+    const lockedPct = selectedSide === "A" ? battle.sideA.pct : battle.sideB.pct;
+    const idemKey = `predict:${battle.id}:${selectedSide}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
+    // Local-first: if the player can afford it, deduct FINI$ optimistically and
+    // show the success state. If the backend is wired up, server settlement
+    // will reconcile when the battle resolves. If offline (dev mode), this is
+    // the authoritative path.
+    const balance = useCoinStore.getState().balance;
+    if (balance < amount) {
+      setPredictResult({ ok: false, error: "Not enough FINI$ to place this prediction." });
+      setPredicting(false);
+      return;
+    }
+    useCoinStore.getState().spend(amount);
+
+    // Helper: parse "15m"/"1h"/"2h" → ms (kept local to avoid a new util import)
+    const parseDur = (label?: string) => {
+      if (!label) return battle!.endsInMs;
+      const m = /^(\d+)(m|h)$/.exec(label.trim());
+      if (!m) return battle!.endsInMs;
+      const n = Number(m[1]);
+      return m[2] === "h" ? n * 3_600_000 : n * 60_000;
+    };
+    // Persist the bet locally so My Active Bets shows up on /crypto + survives reload.
+    const persistBet = (side: "A" | "B", stake: number) => {
+      useMyBets.getState().add({
+        battleId: battle.id,
+        battleTitle: battle.title,
+        side,
+        sideLabel: side === "A" ? battle.sideA.label : battle.sideB.label,
+        stake,
+        endsAt: Date.now() + battle.endsInMs,
+        durationMs: parseDur(battle.durationLabel),
+      });
+    };
+    try {
+      const r = await api.predictPlace({
+        battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey,
+      });
+      setPredictResult({ ok: true, side: r.side, stake: r.stake });
+      persistBet(r.side, r.stake);
+      const wallet = useUIStore.getState().walletAddress;
+      if (wallet) useCoinStore.getState().refresh(wallet);
+    } catch (e) {
+      // Backend not deployed — that's fine in dev mode. The local FINI$ debit
+      // above already happened; treat this as a successful local prediction.
+      const msg = e instanceof Error ? e.message : "predict_failed";
+      if (msg.includes("offline") || msg.includes("Failed to fetch") || msg.includes("backend") || msg.includes("network")) {
+        setPredictResult({ ok: true, side: selectedSide, stake: amount });
+        persistBet(selectedSide, amount);
+      } else {
+        // Real error (insufficient funds server-side, battle closed, etc.) —
+        // refund the optimistic debit and show the message.
+        useCoinStore.getState().earn(amount);
+        const friendly =
+          msg.includes("insufficient_funds")  ? "Not enough FINI$ — claim more or earn from battles."
+        : msg.includes("battle_closed")        ? "This battle is no longer accepting entries."
+        : msg.includes("past_entry_cutoff")    ? "Entry window closed."
+        : msg;
+        setPredictResult({ ok: false, error: friendly });
+      }
+    } finally {
+      setPredicting(false);
+    }
+  }
+
+  if (!battle) {
+    return (
+      <div style={{ ...S, padding: "80px 48px", textAlign: "center" }}>
+        <h2>Battle not found</h2>
+        <Link to="/crypto">← Back to arena</Link>
+      </div>
+    );
+  }
+
+  const { sideA, sideB } = battle;
+  const primaryAsset = battle.assets[0];
+  const color = ASSET_COLORS[primaryAsset] ?? "#f472b6";
+  const meta = ASSET_META[primaryAsset];
+  const endsInMin = Math.floor(battle.endsInMs / 60000);
+  const fee = Math.round(Number(stake) * 0.07 * (sideA.pct / 100) * (sideB.pct / 100));
+
+  function fmtTime(ms: number) {
+    if (ms <= 0) return "Ended";
+    const m = Math.floor(ms / 60000);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  }
+
+  return (
+    <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
+      {/* Breadcrumb */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #f0f0f0", padding: "12px 48px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", gap: 8, fontSize: 13, color: "#888", fontWeight: 600 }}>
+          <Link to="/crypto" style={{ color: "#888", textDecoration: "none" }}>Crypto Arena</Link>
+          <span>/</span>
+          {meta && <Link to={`/crypto/${primaryAsset.toLowerCase()}`} style={{ color: "#888", textDecoration: "none" }}>{meta.name}</Link>}
+          <span>/</span>
+          <span style={{ color: "#111" }}>{battle.title}</span>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 48px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 32, alignItems: "start" }}>
+
+          {/* Left: battle info */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Title block */}
+            <div style={{ background: "#fff", borderRadius: 20, padding: "28px", border: "1.5px solid #f0f0f0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                {battle.assets.map(a => (
+                  <span key={a} style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: ASSET_COLORS[a] + "20", color: ASSET_COLORS[a] }}>{a}</span>
+                ))}
+                <StatusPill status={battle.status} />
+                <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "#888" }}>
+                  ⏱ {fmtTime(battle.endsInMs)}
+                </span>
+              </div>
+              <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111", margin: "0 0 8px" }}>{battle.title}</h1>
+              <p style={{ fontSize: 16, color: "#555", fontWeight: 600, margin: 0, lineHeight: 1.5 }}>{battle.question}</p>
+            </div>
+
+            {/* Hero battle arena — shows two Finis facing off, expands after a
+                prediction is placed. Progress bar tracks time to resolution.
+                Sits above Battle Momentum so the graphic leads the page. */}
+            <BattleArenaHero
+              battle={battle}
+              sideALabel={sideA.label}
+              sideBLabel={sideB.label}
+              sideAPct={sideA.pct}
+              sideBPct={sideB.pct}
+              color={color}
+              userBet={predictResult && predictResult.ok ? predictResult : null}
+            />
+
+            {/* Probability panel */}
+            <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Battle Momentum</div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 900, marginBottom: 10 }}>
+                <span style={{ color: "#16a34a" }}>{sideA.label} {sideA.pct}%</span>
+                <span style={{ color: "#dc2626" }}>{sideB.label} {sideB.pct}%</span>
+              </div>
+              <div style={{ height: 12, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", marginBottom: 16 }}>
+                <div style={{ height: "100%", width: `${sideA.pct}%`, background: "linear-gradient(90deg, #22c55e, #16a34a)", borderRadius: 100 }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 8 }}>
+                <StatBox label="Volume" value={`${battle.volumeK}K`} sub="Fini Coin" />
+                <StatBox label="Time Left" value={fmtTime(battle.endsInMs)} sub={`ends in ${endsInMin}m`} />
+                <StatBox label="Arena Mood" value={battle.volumeK > 100 ? "Volatile" : "Calm"} sub="intensity" />
+              </div>
+            </div>
+
+            {/* Battle log */}
+            <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Battle Log</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {DUMMY_LOG.map((entry, i) => (
+                  <div key={i} style={{ display: "flex", gap: 12, fontSize: 13 }}>
+                    <span style={{ fontFamily: "monospace", color: "#aaa", flexShrink: 0 }}>{entry.time}</span>
+                    <span style={{ color: "#333", fontWeight: 600 }}>{entry.msg}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Rules */}
+            <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Battle Rules</div>
+              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7, fontWeight: 500 }}>
+                Resolution source: CoinGecko API (primary) + Coinbase and Binance (backup), server-side only.<br />
+                Entry cutoff: 30 seconds before battle end. No late entries accepted.<br />
+                Prices, winners, and payouts are determined server-side. The client cannot submit any of these values.<br />
+                If primary and backup prices deviate by more than 50bps, the battle is held for manual review.<br />
+                If no price can be verified, the battle is voided and all entries are returned in full.
+              </div>
+            </div>
+
+            {/* Resolution audit panel — always visible, content depends on status */}
+            {(() => {
+              const instance = MOCK_INSTANCES[battle.id];
+              if (!instance) return null;
+              return (
+                <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
+                  <ResolutionAuditPanel instance={instance} />
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Right: predict panel */}
+          <div style={{ position: "sticky", top: 80 }}>
+            <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0", display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111" }}>Place your prediction</div>
+                <BalanceDisplay />
+              </div>
+
+              {/* Side selector */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <SideBtn label={sideA.label} pct={sideA.pct} side="A" selected={selectedSide === "A"} color="#16a34a" bg="#dcfce7" onSelect={() => setSelectedSide("A")} />
+                <SideBtn label={sideB.label} pct={sideB.pct} side="B" selected={selectedSide === "B"} color="#dc2626" bg="#fee2e2" onSelect={() => setSelectedSide("B")} />
+              </div>
+
+              {/* Amount */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", marginBottom: 8 }}>FINI$ amount</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["50", "100", "250", "500"].map(v => (
+                    <button key={v} onClick={() => setStake(v)} style={{
+                      flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer",
+                      fontSize: 12, fontWeight: 700,
+                      background: stake === v ? "#111" : "#f3f4f6",
+                      color: stake === v ? "#fff" : "#666",
+                    }}>{v}</button>
+                  ))}
+                </div>
+                <input
+                  type="number" value={stake} onChange={e => setStake(e.target.value)}
+                  style={{
+                    width: "100%", marginTop: 8, padding: "10px 14px", borderRadius: 12,
+                    border: "1.5px solid #e5e7eb", fontSize: 14, fontWeight: 600, color: "#111",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              {/* Fee breakdown */}
+              <div style={{ background: "#f9fafb", borderRadius: 12, padding: "12px 14px", fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
+                  <span>Stake</span><span style={{ fontWeight: 700 }}>{stake} FINI$</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
+                  <span>Arena fee (7%)</span><span style={{ fontWeight: 700 }}>~{fee} FINI$</span>
+                </div>
+                <div style={{ height: 1, background: "#e5e7eb", margin: "4px 0" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: "#111" }}>
+                  <span>Max winnings</span>
+                  <span>{selectedSide ? Math.round(Number(stake) * (selectedSide === "A" ? 100 / sideA.pct : 100 / sideB.pct)) : "—"} FINI$</span>
+                </div>
+              </div>
+
+              {/* CTA */}
+              {walletAddress ? (() => {
+                // Once a wager is placed on this battle, lock the page —
+                // you can't double-down or place more bets on the same outcome.
+                const locked = !!predictResult?.ok;
+                if (locked && predictResult?.ok) {
+                  return (
+                    <div>
+                      <button
+                        disabled
+                        style={{
+                          width: "100%", padding: "14px 0", borderRadius: 100,
+                          border: "2px solid #16a34a",
+                          fontSize: 15, fontWeight: 800,
+                          cursor: "not-allowed",
+                          background: "#dcfce7", color: "#15803d",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>🔒</span>
+                        Wager locked — {predictResult.stake} FINI$ on {predictResult.side === "A" ? sideA.label : sideB.label}
+                      </button>
+                      <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "#fff", border: "1.5px solid #f0f0f0", fontSize: 12, color: "#666", fontWeight: 600, lineHeight: 1.5, textAlign: "center" }}>
+                        Entry placed. The outcome settles when the battle's resolution timer hits zero — sit tight.
+                      </div>
+                      <Link
+                        to="/crypto"
+                        style={{
+                          display: "block", marginTop: 10, padding: "10px 14px", borderRadius: 100,
+                          border: "1.5px solid #e5e7eb", background: "#fff",
+                          color: "#666", fontWeight: 700, fontSize: 13,
+                          textAlign: "center", textDecoration: "none",
+                        }}
+                      >
+                        ← Find another battle
+                      </Link>
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <button
+                      onClick={placePrediction}
+                      disabled={!selectedSide || predicting}
+                      style={{
+                        width: "100%", padding: "14px 0", borderRadius: 100, border: "none",
+                        fontSize: 15, fontWeight: 800,
+                        cursor: (!selectedSide || predicting) ? "not-allowed" : "pointer",
+                        background: (!selectedSide || predicting) ? "#e5e7eb" : "#f472b6",
+                        color: (!selectedSide || predicting) ? "#aaa" : "#fff",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {predicting ? "Placing prediction…"
+                        : selectedSide ? `Predict ${selectedSide === "A" ? sideA.label : sideB.label} →`
+                        : "Select a side"}
+                    </button>
+                    {predictResult && !predictResult.ok && (
+                      <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "#fee2e2", border: "1.5px solid #fca5a5", fontSize: 12, color: "#dc2626", fontWeight: 700 }}>
+                        {predictResult.error}
+                      </div>
+                    )}
+                  </>
+                );
+              })() : (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, color: "#888", marginBottom: 10, fontWeight: 600 }}>Connect wallet to predict</div>
+                  <button onClick={() => openConnectModal?.()} style={{
+                    width: "100%", padding: "14px 0", borderRadius: 100, border: "none",
+                    fontSize: 15, fontWeight: 800, cursor: "pointer",
+                    background: "#f472b6", color: "#fff",
+                  }}>
+                    Connect Wallet
+                  </button>
+                </div>
+              )}
+
+              <div style={{ fontSize: 11, color: "#bbb", textAlign: "center", lineHeight: 1.5 }}>
+                Fini Coin is a non-transferable game currency. No real-money betting.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, { bg: string; color: string; label: string }> = {
+    live: { bg: "#dcfce7", color: "#15803d", label: "🟢 Live" },
+    upcoming: { bg: "#dbeafe", color: "#1d4ed8", label: "🔵 Upcoming" },
+    resolving: { bg: "#f3e8ff", color: "#7c3aed", label: "🟣 Resolving" },
+    resolved: { bg: "#f3f4f6", color: "#6b7280", label: "⚫ Resolved" },
+  };
+  const s = styles[status] ?? styles.resolved;
+  return <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: s.bg, color: s.color }}>{s.label}</span>;
+}
+
+function StatBox({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div style={{ textAlign: "center", padding: "12px", borderRadius: 12, background: "#f9fafb" }}>
+      <div style={{ fontSize: 10, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 900, color: "#111" }}>{value}</div>
+      <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>{sub}</div>
+    </div>
+  );
+}
+
+function SideBtn({ label, pct, selected, color, bg, onSelect }: {
+  label: string; pct: number; side: string; selected: boolean; color: string; bg: string; onSelect: () => void;
+}) {
+  return (
+    <button onClick={onSelect} style={{
+      padding: "12px 8px", borderRadius: 12, border: selected ? `2px solid ${color}` : "2px solid transparent",
+      background: selected ? bg : "#f9fafb", cursor: "pointer", transition: "all 0.12s",
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+    }}>
+      <span style={{ fontSize: 18, fontWeight: 900, color: selected ? color : "#555" }}>{pct}%</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: selected ? color : "#888" }}>{label}</span>
+    </button>
+  );
+}
+
+function BalanceDisplay() {
+  const balance = useCoinStore(s => s.balance);
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      padding: "5px 11px", borderRadius: 100,
+      background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+      border: "1.5px solid #fbbf24",
+      color: "#854d0e", fontWeight: 800, fontSize: 12,
+    }}>
+      <span style={{ fontSize: 13 }}>🪙</span>
+      <span>{fmtCoin(balance, { compact: true })}</span>
+      <span style={{ fontSize: 10, opacity: 0.75 }}>FINI$</span>
+    </div>
+  );
+}
+
+/**
+ * Hero battle arena — two Finis facing off with a time-remaining progress bar.
+ * Expands to a large dramatic scene when the user has placed a prediction.
+ *
+ * The placeholder image lives at /public/battle-placeholder.png — Ed dropped
+ * the reference there. (Two cute Finis sketched facing each other.)
+ */
+function BattleArenaHero({
+  battle, sideALabel, sideBLabel, sideAPct, sideBPct, color, userBet,
+}: {
+  battle: { endsInMs: number; assets: string[]; familyA?: string; familyB?: string; durationLabel?: string };
+  sideALabel: string; sideBLabel: string;
+  sideAPct: number; sideBPct: number;
+  color: string;
+  userBet: { side: "A" | "B"; stake: number } | null;
+}) {
+  // Parse the *total* battle duration from its label ("15m", "1h", "2h", "24h").
+  // `battle.endsInMs` is only the time REMAINING, so we can't use it alone to
+  // compute elapsed%.
+  function parseDurationLabel(label?: string): number {
+    if (!label) return battle.endsInMs;
+    const m = /^(\d+)(m|h)$/.exec(label.trim());
+    if (!m) return battle.endsInMs;
+    const n = Number(m[1]);
+    return m[2] === "h" ? n * 60 * 60 * 1000 : n * 60 * 1000;
+  }
+  const totalDuration = parseDurationLabel(battle.durationLabel);
+  const initialEndsAt = useState(() => Date.now() + battle.endsInMs)[0];
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
+  const remaining = Math.max(0, initialEndsAt - now);
+  // Elapsed = total - remaining. Clamped to 0..100%.
+  const elapsedPct = totalDuration > 0
+    ? Math.min(100, Math.max(0, ((totalDuration - remaining) / totalDuration) * 100))
+    : 0;
+
+  function fmt(ms: number) {
+    if (ms <= 0) return "Resolving…";
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    if (h > 0) return `${h}h ${m % 60}m`;
+    if (m > 0) return `${m}m ${s % 60}s`;
+    return `${s}s`;
+  }
+
+  const placed = !!userBet;
+  // After prediction: bigger, more dramatic. Before: compact intro.
+  const minH = placed ? 480 : 260;
+
+  return (
+    <div style={{
+      position: "relative",
+      background: `linear-gradient(135deg, ${color}10, ${color}03)`,
+      borderRadius: 24,
+      border: `1.5px solid ${color}30`,
+      overflow: "hidden",
+      minHeight: minH,
+      transition: "min-height 0.4s ease",
+    }}>
+      {/* Background placeholder art — two Finis facing off */}
+      <img
+        src="/battle-placeholder.png"
+        alt=""
+        onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          objectFit: "contain", objectPosition: "center 60%",
+          opacity: placed ? 1 : 0.55,
+          transition: "opacity 0.4s ease",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Top overlay — side labels + percentages */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0,
+        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+        padding: "20px 28px", zIndex: 2,
+      }}>
+        <div style={{ textAlign: "left", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", padding: "10px 16px", borderRadius: 14, border: userBet?.side === "A" ? "2.5px solid #16a34a" : "1px solid #e5e7eb" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>{battle.familyA ?? "Side A"}</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#16a34a" }}>{sideAPct}%</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a" }}>{sideALabel}</div>
+          {userBet?.side === "A" && <div style={{ fontSize: 10, fontWeight: 800, color: "#16a34a", marginTop: 3 }}>★ YOUR PICK</div>}
+        </div>
+        <div style={{ textAlign: "right", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", padding: "10px 16px", borderRadius: 14, border: userBet?.side === "B" ? "2.5px solid #dc2626" : "1px solid #e5e7eb" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>{battle.familyB ?? "Side B"}</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#dc2626" }}>{sideBPct}%</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{sideBLabel}</div>
+          {userBet?.side === "B" && <div style={{ fontSize: 10, fontWeight: 800, color: "#dc2626", marginTop: 3 }}>★ YOUR PICK</div>}
+        </div>
+      </div>
+
+      {/* Bottom overlay — time-remaining progress bar */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2,
+        background: "rgba(255,255,255,0.92)", backdropFilter: "blur(10px)",
+        padding: "18px 28px", borderTop: "1.5px solid #f0f0f0",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Resolution in</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#111", fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>{fmt(remaining)}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Status</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: remaining > 0 ? "#16a34a" : "#a855f7" }}>
+              {remaining > 0 ? "● Battle in progress" : "⚖️ Awaiting price oracle"}
+            </div>
+          </div>
+        </div>
+        <div style={{ height: 8, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", position: "relative" }}>
+          <div style={{
+            height: "100%", width: `${elapsedPct}%`,
+            background: `linear-gradient(90deg, ${color}, ${color}dd)`,
+            borderRadius: 100,
+            transition: "width 0.5s ease",
+          }} />
+        </div>
+        {placed && userBet && (
+          <div style={{ marginTop: 10, fontSize: 12, color: "#666", fontWeight: 600 }}>
+            You staked <b style={{ color: "#111" }}>{userBet.stake} FINI$</b> on <b style={{ color: userBet.side === "A" ? "#16a34a" : "#dc2626" }}>
+              {userBet.side === "A" ? sideALabel : sideBLabel}
+            </b>. Sit tight — payout settles when the timer hits zero.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

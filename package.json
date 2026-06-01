@@ -1,0 +1,45 @@
+{
+  "name": "finiliar-battler",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Finiliar auto-battle game prototype: cute financial creatures pushed around by the market.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --noEmit",
+    "index:ownership": "node scripts/index-ownership.mjs",
+    "index:ownership:sample": "START=0 COUNT=200 OUT=data/ownership.sample.json PUBLIC= node scripts/index-ownership.mjs",
+    "index:taxonomy": "node scripts/index-taxonomy.mjs",
+    "index:finis": "node scripts/index-finis.mjs",
+    "simulate": "vite-node scripts/simulate.ts"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@supabase/supabase-js": "^2.106.2",
+    "@tanstack/react-query": "^5.100.14",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.16.0",
+    "siwe": "^3.0.0",
+    "viem": "^2.52.0",
+    "wagmi": "^3.6.16",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vite-node": "^2.1.4",
+    "vitest": "^2.1.4"
+  }
+}

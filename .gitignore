@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+*.tsbuildinfo
+
+# Local env (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# macOS / OS
+.DS_Store
+._*
+Thumbs.db
+
+# Editor / scratch
+*.log
+*.tmp
+*.tmp.*
+*.bak
+.idea/
+.vscode/
+
+# Tests / coverage
+coverage/
+
+# Misc
+*.zip
+*.tar.gz
+.cache/
+
+# Heavy art assets — 1+ GB combined, host via CDN / IPFS / Git LFS instead.
+# Local devs should drop their copies here and the app will pick them up.
+public/clan-art/
+public/clan-finis/
+public/hero/

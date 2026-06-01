@@ -1,0 +1,20 @@
+import { create } from "zustand";
+export const useUIStore = create((set) => ({
+    stableOpen: false,
+    leagueOpen: false,
+    tournamentOpen: false,
+    leaderboardOpen: false,
+    walletAddress: null,
+    walletDropdownOpen: false,
+    openStable: () => set({ stableOpen: true }),
+    closeStable: () => set({ stableOpen: false }),
+    openLeague: () => set({ leagueOpen: true }),
+    closeLeague: () => set({ leagueOpen: false }),
+    openTournament: () => set({ tournamentOpen: true }),
+    closeTournament: () => set({ tournamentOpen: false }),
+    openLeaderboard: () => set({ leaderboardOpen: true }),
+    closeLeaderboard: () => set({ leaderboardOpen: false }),
+    connectWallet: (address) => set({ walletAddress: address, walletDropdownOpen: false }),
+    disconnectWallet: () => set({ walletAddress: null, walletDropdownOpen: false }),
+    setWalletDropdown: (open) => set({ walletDropdownOpen: open }),
+}));

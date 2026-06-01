@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "finiliar-run",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--port", "5174", "--host", "127.0.0.1", "--force"],
+      "port": 5174
+    }
+  ]
+}
