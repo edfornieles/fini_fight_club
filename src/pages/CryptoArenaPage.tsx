@@ -145,6 +145,17 @@ export function CryptoArenaPage() {
                     return `${s}s`;
                   };
                   const sideColor = entry.side === "A" ? "#16a34a" : "#dc2626";
+                  // Champion-Fini HP: the current market % for the side the user backed.
+                  // As predictions flow in and odds shift, this bar visibly drops/rises —
+                  // so users instantly see whether their pick is winning or losing.
+                  const liveBattle = battles.find(b => b.id === entry.battleId);
+                  const yourHpPct = liveBattle
+                    ? (entry.side === "A" ? liveBattle.sideA.pct : liveBattle.sideB.pct)
+                    : 50;
+                  // Colour the HP bar by health tier: green winning, yellow tied, red losing
+                  const hpColor = yourHpPct >= 60 ? "#16a34a"
+                                 : yourHpPct >= 40 ? "#f59e0b"
+                                 : "#dc2626";
                   return (
                     <Link
                       key={entry.battleId}
@@ -171,6 +182,25 @@ export function CryptoArenaPage() {
                         <span style={{ color: "#aaa" }}> · </span>
                         <span style={{ color: "#854d0e", fontWeight: 800 }}>{entry.stake} FINI$</span>
                       </div>
+
+                      {/* Champion Fini HP bar — live market % of the backed side */}
+                      {!settled && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: "#666", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>
+                            <span>💚 Champion HP</span>
+                            <span style={{ color: hpColor, fontFamily: "monospace" }}>{Math.round(yourHpPct)}/100</span>
+                          </div>
+                          <div style={{ height: 7, borderRadius: 100, background: "#fee2e2", overflow: "hidden", position: "relative" }}>
+                            <div style={{
+                              height: "100%", width: `${yourHpPct}%`,
+                              background: `linear-gradient(90deg, ${hpColor}, ${hpColor}cc)`,
+                              borderRadius: 100, transition: "width 0.6s ease",
+                            }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Time-to-resolution bar */}
                       <div style={{ height: 5, borderRadius: 100, background: "#f3f4f6", overflow: "hidden", marginBottom: 4 }}>
                         <div style={{
                           height: "100%", width: `${elapsedPct}%`,
