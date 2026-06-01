@@ -22,6 +22,9 @@ import { useStrategies, type Strategy, type StrategyType } from "../state/strate
 import { useCryptoSim } from "../data/cryptoSim";
 import { useMyEntries } from "../state/myEntriesStore";
 import { currentMarketMood, moodMatchesCondition } from "../lib/marketCondition";
+import { velocity5m, velocity1m } from "../lib/velocity";
+import { intraWindowReturn } from "../lib/openingPrices";
+import { bestEdgeSide } from "../lib/edgeCalc";
 
 function parseDuration(label: string): number {
   const m = /^(\d+)(m|h)$/.exec(label.trim());
@@ -38,7 +41,10 @@ interface BattleLike {
 
 function decideForecastSide(strategy: Strategy, battle: BattleLike, remainingMs: number, totalMs: number): "A" | "B" | null {
   const remainingPct = totalMs > 0 ? (remainingMs / totalMs) * 100 : 0;
+  const sym = battle.assets[0]; // first asset for signal lookups
+
   switch (strategy.type as StrategyType) {
+    // ── Pattern-based strategies (read sim odds) ──────────────────────────
     case "flat_bias":
     case "loyalist":
       return strategy.params.sideFilter ?? "A";
@@ -58,6 +64,39 @@ function decideForecastSide(strategy: Strategy, battle: BattleLike, remainingMs:
       if (remainingPct > fireUnder) return null;
       if (Math.abs(battle.sideA.pct - battle.sideB.pct) < 3) return null;
       return battle.sideA.pct > battle.sideB.pct ? "A" : "B";
+    }
+
+    // ── Signal-driven strategies (read the actual underlying) ─────────────
+    case "momentum_underlying": {
+      // 5-minute velocity > threshold (default 0.005 = +0.5%) → predict Up.
+      // Below -threshold → predict Down. Otherwise sit out.
+      const v = velocity5m(sym);
+      if (v == null) return null;
+      const t = strategy.params.velocityThreshold ?? 0.005;
+      if (v >  t) return "A";
+      if (v < -t) return "B";
+      return null;
+    }
+    case "mean_reversion": {
+      // 1-minute |move| > threshold (default 0.02 = 2%) → bet AGAINST the move.
+      // Big upward spike → expect reversion, predict Down. And vice versa.
+      const v = velocity1m(sym);
+      if (v == null) return null;
+      const t = strategy.params.velocityThreshold ?? 0.02;
+      if (v >  t) return "B"; // overshoot up → mean-revert down
+      if (v < -t) return "A"; // overshoot down → mean-revert up
+      return null;
+    }
+    case "late_sniper": {
+      // Only fires in final 60 seconds. Uses the actual intra-window return
+      // to pick the side reality is confirming. Riskless if the price feed
+      // and resolution agree.
+      if (remainingMs > 60_000) return null;
+      const ret = intraWindowReturn(battle.id, sym);
+      if (ret == null) return null;
+      // Need a meaningful move to commit — avoid coin flips
+      if (Math.abs(ret) < 0.001) return null;
+      return ret > 0 ? "A" : "B";
     }
     default:
       return null;
@@ -106,6 +145,17 @@ export function useStrategyExecutor() {
           const total = parseDuration(battle.durationLabel);
           const side = decideForecastSide(strategy, battle, battle.endsInMs, total);
           if (!side) continue;
+
+          // Optional edge gate: only fire when the model's fair-value
+          // estimate diverges from the market by at least minEdgePp.
+          // Skips when we don't have enough price data to estimate fair value.
+          const minEdge = strategy.params.minEdgePp;
+          if (minEdge != null && minEdge > 0) {
+            const e = bestEdgeSide(battle);
+            if (!e) continue; // can't estimate fair value yet
+            if (e.edgePp < minEdge) continue; // not enough edge to act
+            if (e.side !== side) continue; // model disagrees with the pattern — bail
+          }
 
           // Debit the strategy's own budget (NOT the wallet)
           const ok = useStrategies.getState().spendBudget(strategy.id, strategy.stake);

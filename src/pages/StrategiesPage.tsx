@@ -293,12 +293,15 @@ function DeployModal({ onClose }: { onClose: () => void }) {
   const [assetFilter, setAssetFilter] = useState<string[]>([]);
   const [sideFilter, setSideFilter] = useState<"A" | "B">("A");
   const [pctThreshold, setPctThreshold] = useState(40);
+  const [velocityThresholdPct, setVelocityThresholdPct] = useState(0.5);  // % (0.5 = +/-0.5%)
+  const [minEdgePp, setMinEdgePp] = useState(0);                          // pp (0 = no edge gate)
   const [stopAtNetGain, setStopAtNetGain] = useState<number | "">("");
   const [stopAtNetLoss, setStopAtNetLoss] = useState<number | "">("");
 
   const meta = STRATEGY_META[type];
   const needsSide = type === "loyalist" || type === "flat_bias";
   const needsThreshold = type === "contrarian";
+  const needsVelocity = type === "momentum_underlying" || type === "mean_reversion";
 
   const canAfford = balance >= budgetAllocated;
   const validBudget = budgetAllocated >= stake;
@@ -322,6 +325,8 @@ function DeployModal({ onClose }: { onClose: () => void }) {
         assetFilter,
         ...(needsSide ? { sideFilter } : {}),
         ...(needsThreshold ? { pctThreshold } : {}),
+        ...(needsVelocity ? { velocityThreshold: velocityThresholdPct / 100 } : {}),
+        ...(minEdgePp > 0 ? { minEdgePp } : {}),
       },
       stake,
       maxPerDay,
@@ -477,6 +482,32 @@ function DeployModal({ onClose }: { onClose: () => void }) {
             <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Trigger when one side falls below <b style={{ color: "#111" }}>{pctThreshold}%</b></div>
           </Field>
         )}
+
+        {needsVelocity && (
+          <Field label={type === "mean_reversion" ? "Overshoot threshold (act when |1m move| exceeds)" : "Velocity threshold (5m price change to trigger)"}>
+            <input type="range" min={0.1} max={5} step={0.1} value={velocityThresholdPct} onChange={e => setVelocityThresholdPct(Number(e.target.value))} style={{ width: "100%" }} />
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+              {type === "mean_reversion"
+                ? <>Fire when 1-minute price move exceeds <b style={{ color: "#111" }}>±{velocityThresholdPct}%</b> — then bet against it</>
+                : <>Fire when 5-minute velocity is above <b style={{ color: "#111" }}>+{velocityThresholdPct}%</b> (predict Up) or below <b style={{ color: "#111" }}>-{velocityThresholdPct}%</b> (predict Down)</>}
+            </div>
+          </Field>
+        )}
+
+        <Field label="🎯 Edge gate (optional — only fire when our model beats the market by this many pp)">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="range" min={0} max={25} step={1} value={minEdgePp} onChange={e => setMinEdgePp(Number(e.target.value))} style={{ flex: 1 }} />
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#111", minWidth: 60, textAlign: "right" }}>
+              {minEdgePp === 0 ? "OFF" : `${minEdgePp}pp`}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 4, lineHeight: 1.5 }}>
+            With the gate ON, the strategy only fires when the live price feed
+            implies a fair value that beats the market price by ≥{minEdgePp || "?"}pp.
+            Lower trade volume, much higher win rate when it does trade.
+            {minEdgePp === 0 ? <> <b style={{color: "#dc2626"}}>OFF</b> — strategy fires on its pattern alone.</> : null}
+          </div>
+        </Field>
 
         <Field label="Assets to watch (leave empty = all 10)">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

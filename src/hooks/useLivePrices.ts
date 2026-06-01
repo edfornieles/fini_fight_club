@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchPricesMulti, type LivePrices, type PriceData } from "../lib/priceProviders";
+import { recordPrice } from "../lib/velocity";
 
 // Re-export the format helpers + types for backwards-compat with existing imports
 export { fmtPrice, fmtChange } from "../lib/priceProviders";
@@ -36,6 +37,11 @@ export function useLivePrices() {
           setPrices(p);
           setLastUpdated(new Date());
           setError(null);
+          // Feed every successful poll into the velocity tracker so strategies
+          // have rolling 1m/5m/15m deltas to read.
+          for (const [sym, data] of Object.entries(p)) {
+            if (data?.usd) recordPrice(sym, data.usd);
+          }
         }
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "fetch_failed");

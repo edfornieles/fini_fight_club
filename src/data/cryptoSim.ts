@@ -16,6 +16,7 @@
 import { create } from "zustand";
 import { MOCK_BATTLES, type Battle } from "./mockBattles";
 import { getCachedPrices } from "../lib/priceProviders";
+import { snapBattleOpening } from "../lib/openingPrices";
 
 // Parse "15m" / "1h" / "24h" → milliseconds
 function parseDuration(label: string): number {
@@ -143,12 +144,18 @@ export const useCryptoSim = create<SimState>((set, get) => ({
     // Snap an endsAt for each battle so fair-odds tracks consistent elapsed time
     for (const b of get().battles) {
       if (!battleEndsAt.has(b.id)) battleEndsAt.set(b.id, Date.now() + b.endsInMs);
+      // Also snap opening asset prices — strategies use these as the fair-value
+      // reference instead of a 24h-change proxy.
+      snapBattleOpening(b.id, b.assets);
     }
     timer = setInterval(() => {
       if (ghostWallets.length === 0) return;
       const battles = get().battles;
       const liveBattles = battles.filter(b => b.status === "live");
       if (liveBattles.length === 0) return;
+      // Best-effort opening-price snap each tick (idempotent — re-snap is a noop
+      // if already taken). Catches battles where prices hadn't loaded at sim start.
+      for (const b of liveBattles) snapBattleOpening(b.id, b.assets);
 
       // Pick a battle weighted by lateness — late-stage battles get a "burst"
       // of bot activity, mimicking real arb pile-ons as resolution approaches.

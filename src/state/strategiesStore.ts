@@ -17,7 +17,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type StrategyType = "momentum" | "contrarian" | "loyalist" | "late_joiner" | "flat_bias";
+export type StrategyType =
+  | "momentum"            // pattern: pick the side with > 10% sim lead
+  | "contrarian"          // pattern: pick the underdog below threshold
+  | "loyalist"            // pattern: always pick the same side on chosen assets
+  | "late_joiner"         // pattern: pick the leader in the final 10% of the battle
+  | "flat_bias"           // pattern: always pick side A (or B)
+  // ── Tier-1 signal-driven templates (read the actual underlying, not the sim) ──
+  | "momentum_underlying" // fires when the asset's 5m velocity exceeds a threshold
+  | "mean_reversion"      // fires when |1m velocity| > threshold — bets against the overshoot
+  | "late_sniper";        // in the final 60s, picks the side matching the real price direction
 
 export type ReinvestMode = "compound" | "save";
 
@@ -59,6 +68,10 @@ export interface Strategy {
     sideFilter?: "A" | "B";
     pctThreshold?: number;
     fireUnderRemainingPct?: number;
+    /** Tier-1: only fire when |edge in percentage points| > this. Optional. */
+    minEdgePp?: number;
+    /** For momentum_underlying / mean_reversion: velocity threshold (e.g. 0.005 = 0.5%). */
+    velocityThreshold?: number;
   };
 
   /** Capital per forecast, in FINI$. */
@@ -115,7 +128,8 @@ const emptyStats: StrategyStats = {
   netProfit: 0,
 };
 
-export const STRATEGY_META: Record<StrategyType, { name: string; icon: string; description: string; color: string }> = {
+export const STRATEGY_META: Record<StrategyType, { name: string; icon: string; description: string; color: string; signalDriven?: boolean }> = {
+  // Pattern-based (read the sim's own odds)
   momentum:    { name: "Momentum Hunter", icon: "🌊", color: "#06b6d4",
     description: "Picks the side gaining the most ground in the final stretch of a battle. Rides the wave once it's clear." },
   contrarian:  { name: "Contrarian",      icon: "🔄", color: "#f97316",
@@ -126,6 +140,14 @@ export const STRATEGY_META: Record<StrategyType, { name: string; icon: string; d
     description: "Only acts in the final 10% of a battle, when the winner is nearly certain. Boring but reliable." },
   flat_bias:   { name: "Flat Bias",       icon: "🎲", color: "#6b7280",
     description: "Always picks side A (or B) on every eligible battle. Useful as a baseline benchmark." },
+
+  // Signal-driven (read the actual underlying asset price)
+  momentum_underlying: { name: "Live Momentum", icon: "📈", color: "#0ea5e9", signalDriven: true,
+    description: "Reads the asset's real 5-minute price velocity. Predicts Up when momentum exceeds threshold (default +0.5%). Reactive to actual market movement." },
+  mean_reversion: { name: "Mean Reversion", icon: "🪞", color: "#f59e0b", signalDriven: true,
+    description: "When the asset's 1-minute move exceeds the threshold (default ±2%), bets against the overshoot — assuming the spike reverses." },
+  late_sniper: { name: "Late Sniper", icon: "🎯", color: "#dc2626", signalDriven: true,
+    description: "Only acts in the final 60 seconds. Reads the actual intra-window price change and picks whichever side reality confirms. Near-riskless if you trust the price feed." },
 };
 
 export const MARKET_CONDITION_META: Record<MarketCondition, { label: string; icon: string; description: string }> = {
