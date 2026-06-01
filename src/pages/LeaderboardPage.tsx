@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { asset } from "../lib/assetUrl";
 import { Link } from "react-router-dom";
 import { useLivePrices, fmtChange } from "../hooks/useLivePrices";
@@ -62,6 +63,14 @@ const CLAN_TINTS: Record<string, string> = {
 
 export function LeaderboardPage() {
   const { prices } = useLivePrices();
+  const [arenaLadder, setArenaLadder] = useState<"profit" | "volume">("profit");
+
+  // Two ladders, Polymarket-style: rank by profit (being right) OR by volume
+  // (being active). Volume derived from prediction count × avg stake.
+  const arenaPlayers = CRYPTO_ARENA_TOP_PLAYERS
+    .map(p => ({ ...p, volume: p.totalPredictions * 150 }))
+    .sort((a, b) => arenaLadder === "profit" ? b.netFini - a.netFini : b.volume - a.volume)
+    .map((p, i) => ({ ...p, rank: i + 1 }));
 
   // Build the 24h family ranking from live prices, sorted by % change desc.
   const familyRanking = Object.entries(FAMILY_META)
@@ -93,12 +102,26 @@ export function LeaderboardPage() {
           number={1}
           icon="🎯"
           title="Crypto Arena Champions"
-          subtitle="Players with the highest net FINI$ won across prediction battles"
+          subtitle={arenaLadder === "profit" ? "Ranked by net FINI$ won — being right pays" : "Ranked by total FINI$ staked — the most active traders"}
           accent="#f472b6"
         >
+          {/* Profit vs Volume ladder toggle */}
+          <div style={{ display: "inline-flex", gap: 4, background: "#f3f4f6", borderRadius: 100, padding: 4, marginBottom: 12 }}>
+            {(["profit", "volume"] as const).map(l => (
+              <button key={l} onClick={() => setArenaLadder(l)} style={{
+                padding: "6px 16px", borderRadius: 100, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 800,
+                background: arenaLadder === l ? "#fff" : "transparent",
+                color: arenaLadder === l ? "#111" : "#888",
+                boxShadow: arenaLadder === l ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
+              }}>
+                {l === "profit" ? "💰 Most Profit" : "📊 Most Volume"}
+              </button>
+            ))}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {CRYPTO_ARENA_TOP_PLAYERS.map(p => (
-              <PlayerRow key={p.rank} player={p} />
+            {arenaPlayers.map(p => (
+              <PlayerRow key={p.wallet} player={p} ladder={arenaLadder} />
             ))}
           </div>
         </Section>
@@ -153,13 +176,14 @@ export function LeaderboardPage() {
 
 // ─── Row components ─────────────────────────────────────────────────────────
 
-function PlayerRow({ player }: { player: typeof CRYPTO_ARENA_TOP_PLAYERS[number] }) {
+function PlayerRow({ player, ladder }: { player: typeof CRYPTO_ARENA_TOP_PLAYERS[number] & { volume: number }; ladder: "profit" | "volume" }) {
   const short = `${player.wallet.slice(0, 6)}…${player.wallet.slice(-4)}`;
   return (
-    <div style={{
+    <Link to={`/p/${player.wallet}`} style={{
       display: "flex", alignItems: "center", gap: 14,
       padding: "12px 16px", borderRadius: 12,
       background: "#fff", border: "1.5px solid #f0f0f0",
+      textDecoration: "none", color: "inherit",
     }}>
       <RankBadge rank={player.rank} />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -167,14 +191,20 @@ function PlayerRow({ player }: { player: typeof CRYPTO_ARENA_TOP_PLAYERS[number]
         <div style={{ fontSize: 11, color: "#888", fontFamily: "monospace" }}>{short}</div>
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 900, color: "#854d0e" }}>
-          +{player.netFini.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>FINI$</span>
-        </div>
+        {ladder === "profit" ? (
+          <div style={{ fontSize: 15, fontWeight: 900, color: "#16a34a" }}>
+            +{player.netFini.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>FINI$</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 15, fontWeight: 900, color: "#854d0e" }}>
+            {player.volume.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>FINI$ vol</span>
+          </div>
+        )}
         <div style={{ fontSize: 10, color: "#aaa" }}>
           {player.totalPredictions} predictions · {Math.round(player.winRate * 100)}% win rate
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

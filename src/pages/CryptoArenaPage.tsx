@@ -5,7 +5,9 @@ import { ASSET_META } from "../data/mockBattles";
 import type { BattleType } from "../data/mockBattles";
 import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
 import { useLivePrices, fmtPrice, fmtChange } from "../hooks/useLivePrices";
-import { useMyEntries } from "../state/myEntriesStore";
+import { useMyEntries, positionValue } from "../state/myEntriesStore";
+import { useCoinStore } from "../state/coinStore";
+import { useNotifications } from "../state/notificationsStore";
 import { personaFor } from "../lib/ghostPersonas";
 
 const TOPIC_TABS = ["Trending", "Live", "Ending Soon", "High Volume"];
@@ -26,6 +28,9 @@ export function CryptoArenaPage() {
   const feed = useSimFeed();
   const start = useCryptoSim(s => s.start);
   const myEntries = useMyEntries(s => s.entries);
+  const sellEntry = useMyEntries(s => s.sellEntry);
+  const earn = useCoinStore(s => s.earn);
+  const pushNotif = useNotifications(s => s.push);
   // Re-render every second so the My Active Battles progress bars tick smoothly
   const [, setNowTick] = useState(0);
   useEffect(() => {
@@ -157,7 +162,8 @@ export function CryptoArenaPage() {
                   const elapsedPct = entry.durationMs > 0
                     ? Math.min(100, ((entry.durationMs - remaining) / entry.durationMs) * 100)
                     : 100;
-                  const settled = remaining <= 0;
+                  // "settled" = no longer a live, tradeable position (timer ended OR already resolved/sold)
+                  const settled = remaining <= 0 || entry.status !== "open";
                   const fmtTime = (ms: number) => {
                     if (ms <= 0) return "Resolving…";
                     const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60);
@@ -197,6 +203,8 @@ export function CryptoArenaPage() {
                           <span style={{ fontSize: 9, fontWeight: 800, color: "#15803d", padding: "1px 6px", borderRadius: 100, background: "#dcfce7", whiteSpace: "nowrap" }}>🎉 WON +{entry.result?.netProfit ?? 0}</span>
                         ) : entry.status === "lost" ? (
                           <span style={{ fontSize: 9, fontWeight: 800, color: "#b91c1c", padding: "1px 6px", borderRadius: 100, background: "#fee2e2", whiteSpace: "nowrap" }}>💀 LOST {entry.result?.netProfit ?? -entry.stake}</span>
+                        ) : entry.status === "sold" ? (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: "#6d28d9", padding: "1px 6px", borderRadius: 100, background: "#f3e8ff", whiteSpace: "nowrap" }}>💸 SOLD</span>
                         ) : entry.status === "voided" ? (
                           <span style={{ fontSize: 9, fontWeight: 800, color: "#6d28d9", padding: "1px 6px", borderRadius: 100, background: "#f3e8ff", whiteSpace: "nowrap" }}>↩️ VOID · refunded</span>
                         ) : settled ? (
@@ -225,6 +233,55 @@ export function CryptoArenaPage() {
                               borderRadius: 100, transition: "width 0.6s ease",
                             }} />
                           </div>
+                        </div>
+                      )}
+
+                      {/* Mark-to-market value + sell-early (Polymarket-style) */}
+                      {!settled && (() => {
+                        const curVal = liveBattle ? positionValue(entry, yourHpPct) : entry.stake;
+                        const pnl = curVal - entry.stake;
+                        const pnlColor = pnl > 0 ? "#16a34a" : pnl < 0 ? "#dc2626" : "#888";
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#666" }}>
+                              Worth now{" "}
+                              <span style={{ color: "#111", fontWeight: 900 }}>{curVal} FINI$</span>{" "}
+                              <span style={{ color: pnlColor, fontWeight: 800 }}>
+                                ({pnl >= 0 ? "+" : ""}{pnl})
+                              </span>
+                            </div>
+                            <button
+                              onClick={e => {
+                                e.preventDefault(); e.stopPropagation();
+                                const sold = sellEntry(entry.battleId, curVal);
+                                if (sold) {
+                                  earn(curVal);
+                                  pushNotif({
+                                    tone: pnl >= 0 ? "win" : "loss",
+                                    icon: "💸",
+                                    title: `Sold for ${curVal} FINI$`,
+                                    body: `${entry.battleTitle} — cashed out early at ${Math.round(yourHpPct)}% (entered ${Math.round(entry.entryPct)}%). ${pnl >= 0 ? "+" : ""}${pnl} FINI$.`,
+                                    durationMs: 6000,
+                                  });
+                                }
+                              }}
+                              style={{
+                                flexShrink: 0, padding: "5px 12px", borderRadius: 100,
+                                background: "#111", color: "#fff", border: "none",
+                                fontSize: 11, fontWeight: 800, cursor: "pointer",
+                              }}
+                              title="Cash out this position now at the current market value"
+                            >
+                              Sell
+                            </button>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Sold confirmation chip */}
+                      {entry.status === "sold" && (
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6d28d9", marginBottom: 6 }}>
+                          💸 Sold early for {entry.soldFor} FINI$ ({(entry.soldFor ?? 0) - entry.stake >= 0 ? "+" : ""}{(entry.soldFor ?? 0) - entry.stake})
                         </div>
                       )}
 

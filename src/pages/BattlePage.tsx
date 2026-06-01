@@ -81,6 +81,7 @@ export function BattlePage() {
         side,
         sideLabel: side === "A" ? battle.sideA.label : battle.sideB.label,
         stake,
+        entryPct: side === "A" ? battle.sideA.pct : battle.sideB.pct,
         endsAt: Date.now() + battle.endsInMs,
         durationMs: parseDur(battle.durationLabel),
       });
@@ -170,7 +171,14 @@ export function BattlePage() {
                 </span>
               </div>
               <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111", margin: "0 0 8px" }}>{battle.title}</h1>
-              <p style={{ fontSize: 16, color: "#555", fontWeight: 600, margin: 0, lineHeight: 1.5 }}>{battle.question}</p>
+              <p style={{ fontSize: 16, color: "#555", fontWeight: 600, margin: "0 0 12px", lineHeight: 1.5 }}>{battle.question}</p>
+              {/* Stated resolution rule — the contract, up front */}
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#f8fafc", border: "1px solid #e8edf2", borderRadius: 10, padding: "10px 12px" }}>
+                <span style={{ fontSize: 13 }}>⚖️</span>
+                <span style={{ fontSize: 12, color: "#475569", fontWeight: 600, lineHeight: 1.5 }}>
+                  {resolutionRule(battle)}
+                </span>
+              </div>
             </div>
 
             {/* Hero battle arena — shows two Finis facing off, expands after a
@@ -661,4 +669,25 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
       </div>
     </div>
   );
+}
+
+/** A clear, stated resolution rule per battle type — the "contract" shown up front. */
+function resolutionRule(battle: { type: string; assets: string[]; durationLabel: string }): string {
+  const a = battle.assets[0];
+  const b = battle.assets[1];
+  const src = "median of CoinGecko + Coinbase + Binance";
+  switch (battle.type) {
+    case "updown":
+      return `Resolves "Up" if ${a}'s price at window close is higher than at open, else "Down". ${battle.durationLabel} window, priced by ${src}.`;
+    case "outperform":
+      return `Resolves to whichever of ${a} / ${b} has the higher % return over the ${battle.durationLabel} window, priced by ${src}.`;
+    case "abovebelow":
+      return `Resolves on whether ${a} is above or below the target at window close (${battle.durationLabel}), priced by ${src}.`;
+    case "volatility":
+      return `Resolves on whether ${a} moves more than the threshold in either direction over ${battle.durationLabel}, priced by ${src}.`;
+    case "clanwar":
+      return `Resolves to the Fini family with the best combined performance over ${battle.durationLabel}, priced by ${src}.`;
+    default:
+      return `Resolves at window close (${battle.durationLabel}) using the ${src}. If sources disagree beyond tolerance, the battle is held for review.`;
+  }
 }

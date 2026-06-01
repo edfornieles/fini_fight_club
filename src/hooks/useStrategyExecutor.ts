@@ -171,6 +171,7 @@ export function useStrategyExecutor() {
             side,
             sideLabel,
             stake: strategy.stake,
+            entryPct: side === "A" ? battle.sideA.pct : battle.sideB.pct,
             endsAt: Date.now() + battle.endsInMs,
             durationMs: total,
             strategyId: strategy.id,
