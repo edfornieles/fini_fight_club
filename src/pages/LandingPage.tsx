@@ -32,12 +32,24 @@ export function LandingPage() {
               Finis are digital beings that embody the emotional ties between people and the world around them.
             </p>
             <div style={{ display: "flex", gap: 12, marginTop: 36 }}>
-              <button style={{ background: "#0a0a0a", color: "#fff", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+              <a
+                href="https://opensea.io/collection/finiliar"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ background: "#0a0a0a", color: "#fff", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer", textDecoration: "none", display: "inline-block" }}
+              >
                 Get your Fini
-              </button>
-              <button style={{ background: "transparent", color: "#0a0a0a", border: "2px solid #0a0a0a", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+              </a>
+              <a
+                href="#explore"
+                onClick={e => {
+                  e.preventDefault();
+                  document.getElementById("explore")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                style={{ background: "transparent", color: "#0a0a0a", border: "2px solid #0a0a0a", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer", textDecoration: "none", display: "inline-block" }}
+              >
                 View collection
-              </button>
+              </a>
             </div>
           </div>
           <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "center", minHeight: 480 }}>

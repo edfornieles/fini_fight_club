@@ -139,7 +139,7 @@ export function ExploreSection() {
   const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
   return (
-    <section style={{ ...S, background: "#fff", padding: "80px 56px 64px" }}>
+    <section id="explore" style={{ ...S, background: "#fff", padding: "80px 56px 64px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 36 }}>
         <div>
           <h2 style={{ fontSize: 42, fontWeight: 800, color: "#111", lineHeight: 1.15, letterSpacing: "-0.5px", margin: 0 }}>
