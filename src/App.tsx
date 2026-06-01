@@ -34,6 +34,9 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { FightClubPage } from "./pages/FightClubPage";
 import { FiniProfilePage } from "./pages/FiniProfilePage";
+import { PlayerProfilePage } from "./pages/PlayerProfilePage";
+import { ChallengePage } from "./pages/ChallengePage";
+import { TournamentPage } from "./pages/TournamentPage";
 
 export default function App() {
   return (
@@ -53,6 +56,9 @@ export default function App() {
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/fight-club" element={<FightClubPage />} />
           <Route path="/fini/:tokenId" element={<FiniProfilePage />} />
+          <Route path="/p/:wallet" element={<PlayerProfilePage />} />
+          <Route path="/challenge" element={<ChallengePage />} />
+          <Route path="/tournament" element={<TournamentPage />} />
         </Routes>
       </ErrorBoundary>
       {/* Game overlays (modal layers, phase-driven) */}

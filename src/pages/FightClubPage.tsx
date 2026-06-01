@@ -8,6 +8,7 @@ import { useInventory, POTIONS, type PotionId } from "../state/inventory";
 import { useTicker } from "../hooks/useTicker";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { pickGhostOpponent, shortenWallet, synthFini, loadGhostTeams } from "../game/ghostOpponents";
+import { useTreasury } from "../state/treasuryStore";
 import { FAMILY_ROLE, ROLE_META, ITEM_SYNERGY, SYNERGY_BONUS_MULTIPLIER, hasSynergy, familyDamageMultiplier, type FamilyRole } from "../game/familyRoles";
 
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -217,15 +218,26 @@ export function FightClubPage() {
   }
 
   function findOpponent() {
+    // Direct-challenge path: if a /challenge link dumped a pending opponent into
+    // sessionStorage, use that instead of random matchmaking.
+    const pendingRaw = typeof window !== "undefined" ? sessionStorage.getItem("pending-challenge") : null;
+    if (pendingRaw) {
+      try {
+        const pending = JSON.parse(pendingRaw) as { from: string; teamIds: number[]; stake: number };
+        sessionStorage.removeItem("pending-challenge");
+        const opp = pending.teamIds.slice(0, 3).map(id => synthFini(id));
+        setOpponent(opp);
+        setOpponentName(shortenWallet(pending.from));
+        return;
+      } catch { /* fall through to normal matchmaking */ }
+    }
     // Use actual battle stats (HP/ATK/DEF/SPD with items factored in) so
     // ghost matchmaking reflects how lethal the player ACTUALLY is — not
     // just their XP/level. Items add directly to f.atk/f.def/f.maxHp/f.speed,
     // so summing those properly captures equipment power too.
     const yourBattleStats = team.reduce((s, f) =>
       s + f.maxHp + f.atk * 3 + f.def * 2 + f.speed * 2, 0);
-    const yourPower = yourBattleStats; // used downstream for tier display
-    // Try to match against a real Fini holder's ghost team (±15% power band).
-    // Falls back to the synthetic generator if the seed file isn't loaded.
+    const yourPower = yourBattleStats;
     pickGhostOpponent(yourPower).then(ghost => {
       setOpponent(ghost.finis);
       setOpponentName(shortenWallet(ghost.wallet));
@@ -253,18 +265,32 @@ export function FightClubPage() {
     setWinner(result);
     setView("result");
     const outcome: "win" | "loss" | "draw" = result === "you" ? "win" : result === "them" ? "loss" : "draw";
-    const payout = outcome === "win" ? stake * 2 : outcome === "draw" ? stake : 0;
+    const intendedPayout = outcome === "win" ? stake * 2 : outcome === "draw" ? stake : 0;
     const battleId = `fc:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
     const teamTokenIds = team.map(f => f.id);
 
     // Optimistic local update so the UI feels instant
     applyBatch(teamTokenIds.map(tokenId => ({ tokenId, outcome })));
-    if (result === "you") earn(stake * 2);
-    else if (result === "draw") earn(stake);
-    // Drip Crumbs after every battle. Outcome-dependent: win=25, loss=10, draw=17.
-    // SAP-style restraint — you only earn enough for interesting choices by
-    // stringing wins together.
+
+    // Route the payout through the treasury so:
+    //  - wins draw from the treasury bank (capped at daily limit per wallet)
+    //  - losses + stake feed back to the treasury
+    //  - the player sees a real "source of funds" instead of money appearing
+    //    from the void
+    const wallet = walletAddress ?? "0xunknown";
+    const { actualPayout, cappedAt } = useTreasury.getState().settleGhostBattle(
+      wallet, intendedPayout, stake
+    );
+    if (actualPayout > 0) earn(actualPayout);
+    if (cappedAt) {
+      console.warn(`[treasury] daily cap hit (${cappedAt} FINI$/day). Payout capped from ${intendedPayout} to ${actualPayout}.`);
+    }
+
+    // Drip Crumbs after every battle. Outcome-dependent: win=8, loss=3, draw=avg.
     useCrumbStore.getState().rewardBattle(outcome);
+
+    // Payout for downstream API call (server settlement when backend is live)
+    const payout = actualPayout;
 
     // Authoritative server settlement (records battle, applies stat changes, credits payout).
     // Stake debit happens here too — startBattle's `spend()` was the optimistic cache update only.
@@ -369,6 +395,8 @@ export function FightClubPage() {
       {view === "result" && winner && (
         <ResultView
           winner={winner} stake={stake}
+          opponentName={opponentName}
+          opponentTeamIds={opponent.map(f => f.id)}
           onReturn={() => { setView("workshop"); setOpponent([]); setOpponentName(""); }}
         />
       )}
@@ -512,7 +540,7 @@ function WorkshopView({
                 <span style={{ color: "#16a34a" }}>{stake * 2}</span>
                 <span style={{ fontSize: 13, color: "#854d0e" }}> FINI$</span>
               </div>
-              <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>Winner takes opponent's stake</div>
+              <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>Winnings paid by the Fini Treasury (beta)</div>
             </div>
             {opponent.length > 0 ? (
               <><button onClick={onStartBattle} disabled={balance < stake || anyResting} title={anyResting ? "One of your starters is resting — swap them out, use a potion, or wake the team" : ""} style={{
@@ -1010,20 +1038,25 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
     // Opening narration
     setLog([{ side: "system", msg: `⚔️ Battle begins — ${team.length}v${opponent.length}`, details: `You vs ${opponentName}`, key: Date.now() }]);
 
+    let ended = false; // bug-fix: was double-firing onBattleEnd via the nextTick chain
+
     function nextTick() {
+      if (ended) return; // hard guard against the re-entrant schedule bug
       const intervalMs = 1100 / speedRef.current;
       tickRef.current = setTimeout(() => {
         runTurn();
-        nextTick();
+        if (!ended) nextTick();
       }, intervalMs);
     }
 
     function runTurn() {
+      if (ended) return; // belt-and-braces: never re-enter after settlement
       const { teamHp: th, oppHp: oh, turn } = battleRef.current;
       const teamAlive = th.some(h => h > 0);
       const oppAlive  = oh.some(h => h > 0);
 
       if (!teamAlive || !oppAlive) {
+        ended = true;
         if (tickRef.current) clearTimeout(tickRef.current);
         tickRef.current = null;
         const result = teamAlive && !oppAlive ? "you" : oppAlive && !teamAlive ? "them" : "draw";
@@ -1277,9 +1310,23 @@ function BattleFiniCard({ fini, hp, maxHp, attacking, defending, ko }: { fini: F
 
 // ── Result view ───────────────────────────────────────────────────────────────
 
-function ResultView({ winner, stake, onReturn }: { winner: "you" | "them" | "draw"; stake: number; onReturn: () => void }) {
+function ResultView({ winner, stake, opponentName, opponentTeamIds, onReturn }: {
+  winner: "you" | "them" | "draw"; stake: number;
+  opponentName: string; opponentTeamIds: number[];
+  onReturn: () => void;
+}) {
   const isWin = winner === "you";
   const isDraw = winner === "draw";
+  // Build a challenge-back URL pointing at the same opponent's roster
+  const opponentLooksLikeWallet = /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i.test(opponentName) || opponentName.startsWith("0x");
+  const challengeBackUrl = opponentLooksLikeWallet && opponentTeamIds.length > 0
+    ? `${window.location.origin}/challenge?from=${opponentName.replace("…", "")}&team=${opponentTeamIds.join(",")}&stake=${stake}`
+    : null;
+  function tweetResult() {
+    const verb = isWin ? "Just beat" : isDraw ? "Drew with" : "Just lost to";
+    const text = `⚔️ ${verb} ${opponentName} in Fini Fight Club!\n${isWin ? `+${stake} FINI$ 💸` : isDraw ? "Honors even." : `-${stake} FINI$ — running it back.`}\n${window.location.origin}/fight-club`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank");
+  }
   return (
     <div style={{ minHeight: "calc(100vh - 64px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", gap: 24 }}>
       <div style={{ fontSize: 72 }}>{isWin ? "🏆" : isDraw ? "🤝" : "💀"}</div>
@@ -1298,7 +1345,7 @@ function ResultView({ winner, stake, onReturn }: { winner: "you" | "them" | "dra
       <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: "18px 24px", minWidth: 320, fontSize: 13 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Payout breakdown</div>
         <Row label="Your stake"        value={`-${stake}`}                     color="#dc2626" />
-        <Row label="Opponent's stake"  value={`+${stake} (matched)`}            color="#888" />
+        <Row label="Treasury contribution"  value={`+${stake} (beta-funded)`}    color="#888" />
         {isWin && (
           <>
             <div style={{ height: 1, background: "#f0f0f0", margin: "8px 0" }} />
@@ -1321,13 +1368,33 @@ function ResultView({ winner, stake, onReturn }: { winner: "you" | "them" | "dra
           </>
         )}
       </div>
-      <button onClick={onReturn} style={{
-        background: "#f472b6", color: "#fff", border: "none", borderRadius: 100,
-        padding: "14px 40px", fontSize: 15, fontWeight: 800, cursor: "pointer",
-        boxShadow: "0 6px 20px rgba(244,114,182,0.30)",
-      }}>
-        ← Back to Workshop
-      </button>
+      {/* Primary + share actions */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <button onClick={onReturn} style={{
+          background: "#f472b6", color: "#fff", border: "none", borderRadius: 100,
+          padding: "14px 32px", fontSize: 15, fontWeight: 800, cursor: "pointer",
+          boxShadow: "0 6px 20px rgba(244,114,182,0.30)",
+        }}>
+          ← Back to Workshop
+        </button>
+        {challengeBackUrl && (
+          <a href={challengeBackUrl} style={{
+            background: "#fff", color: "#be185d",
+            border: "2px solid #f472b6", borderRadius: 100,
+            padding: "12px 26px", fontSize: 14, fontWeight: 800,
+            textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8,
+          }}>
+            🔄 Run it back
+          </a>
+        )}
+        <button onClick={tweetResult} style={{
+          background: "#fff", color: "#1d9bf0",
+          border: "1.5px solid #1d9bf0", borderRadius: 100,
+          padding: "12px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+        }}>
+          🐦 Tweet result
+        </button>
+      </div>
       <Link to="/leaderboard" style={{ fontSize: 13, color: "#888", textDecoration: "none", fontWeight: 700 }}>
         See leaderboard →
       </Link>
