@@ -3,28 +3,25 @@
  *
  * For each enabled strategy:
  *  1. Check the daily cap (forecastsToday < maxPerDay)
- *  2. Find candidate battles (live, in entry window, asset matches filter,
- *     not already entered)
- *  3. Apply the strategy's trigger condition
- *  4. If a candidate matches, place a forecast — debits FINI$, adds a
- *     MyEntry row, increments the strategy's counter
+ *  2. Check the strategy's segregated budget (budget.remaining >= stake)
+ *  3. Check the required market condition matches the current mood
+ *  4. Find candidate live battles (asset filter, no existing entry)
+ *  5. Apply the strategy's per-battle trigger
+ *  6. Place forecast: debits the strategy's budget (NOT the wallet),
+ *     creates a MyEntry tagged with strategyId for stats-tracking
  *
- * The placed forecast then flows through useBattleResolver naturally when
- * the battle expires — settling stake + outcome and updating the strategy's
- * win/loss stats.
- *
- * Notes:
- *  - We share parseDuration with cryptoSim's endsAt snapshot, so "remaining"
- *    is a consistent number across both modules.
- *  - Forecasters can't out-spend the wallet — if FINI$ < stake, the forecast
- *    is silently skipped (the strategy stays enabled, will retry next tick).
+ * Capital flow:
+ *  - At deploy time, budgetAllocated was already debited from the wallet
+ *  - The strategy spends from its own budget pool
+ *  - On settle, the resolver routes payouts back via strategiesStore.recordOutcome
+ *    which handles compound vs save modes and auto-pause triggers
  */
 
 import { useEffect } from "react";
 import { useStrategies, type Strategy, type StrategyType } from "../state/strategiesStore";
 import { useCryptoSim } from "../data/cryptoSim";
 import { useMyEntries } from "../state/myEntriesStore";
-import { useCoinStore } from "../state/coinStore";
+import { currentMarketMood, moodMatchesCondition } from "../lib/marketCondition";
 
 function parseDuration(label: string): number {
   const m = /^(\d+)(m|h)$/.exec(label.trim());
@@ -39,37 +36,26 @@ interface BattleLike {
   sideB: { label: string; pct: number };
 }
 
-/** Decide whether this strategy wants to forecast this battle, and on which side. */
 function decideForecastSide(strategy: Strategy, battle: BattleLike, remainingMs: number, totalMs: number): "A" | "B" | null {
   const remainingPct = totalMs > 0 ? (remainingMs / totalMs) * 100 : 0;
-
   switch (strategy.type as StrategyType) {
-    case "flat_bias": {
-      // Always pick the configured side
+    case "flat_bias":
+    case "loyalist":
       return strategy.params.sideFilter ?? "A";
-    }
-    case "loyalist": {
-      // Same as flat — but conceptually anchored to a specific asset
-      return strategy.params.sideFilter ?? "A";
-    }
     case "contrarian": {
-      // Pick the side whose share is below the threshold
       const threshold = strategy.params.pctThreshold ?? 40;
       if (battle.sideA.pct < threshold) return "A";
       if (battle.sideB.pct < threshold) return "B";
-      return null; // no obvious underdog
+      return null;
     }
     case "momentum": {
-      // Pick the leading side, but only when the lead is meaningful (>10%)
       const diff = Math.abs(battle.sideA.pct - battle.sideB.pct);
       if (diff < 10) return null;
       return battle.sideA.pct > battle.sideB.pct ? "A" : "B";
     }
     case "late_joiner": {
-      // Only fire when battle is past the fireUnderRemainingPct threshold
       const fireUnder = strategy.params.fireUnderRemainingPct ?? 10;
       if (remainingPct > fireUnder) return null;
-      // Pick the clear leader
       if (Math.abs(battle.sideA.pct - battle.sideB.pct) < 3) return null;
       return battle.sideA.pct > battle.sideB.pct ? "A" : "B";
     }
@@ -86,21 +72,27 @@ export function useStrategyExecutor() {
       if (enabled.length === 0) return;
 
       useStrategies.getState().resetDailyIfStale();
+      const mood = currentMarketMood();
       const battles = useCryptoSim.getState().battles;
       const liveBattles = battles.filter(b => b.status === "live") as BattleLike[];
       const myEntries = useMyEntries.getState().entries;
-      const myWallet = useCoinStore.getState().balance; // just a sanity check that the store is loaded
 
       for (const strategy of enabled) {
         const stats = strategy.stats;
+        // Daily cap
         if (stats.forecastsToday >= strategy.maxPerDay) continue;
-        if (useCoinStore.getState().balance < strategy.stake) continue;
+        // Market-condition gate
+        if (!moodMatchesCondition(mood, strategy.marketCondition)) continue;
+        // Budget gate (covered also by spendBudget but skip cheaply)
+        if (strategy.budget.remaining < strategy.stake) {
+          // Auto-pause due to budget exhaustion
+          useStrategies.getState().pause(strategy.id, "budget_exhausted");
+          continue;
+        }
 
         // Filter candidate battles
         const candidates = liveBattles.filter(b => {
-          // Must not already have an open entry from this user
           if (myEntries.some(e => e.battleId === b.id && e.status === "open")) return false;
-          // Apply asset whitelist
           if (strategy.params.assetFilter.length > 0) {
             const overlap = b.assets.some(a => strategy.params.assetFilter.includes(a));
             if (!overlap) return false;
@@ -109,17 +101,20 @@ export function useStrategyExecutor() {
         });
         if (candidates.length === 0) continue;
 
-        // Pick the first candidate the strategy is interested in this tick
+        // Place ONE forecast per tick per strategy (avoid hammering)
         for (const battle of candidates) {
           const total = parseDuration(battle.durationLabel);
           const side = decideForecastSide(strategy, battle, battle.endsInMs, total);
           if (!side) continue;
 
-          // Place the forecast
+          // Debit the strategy's own budget (NOT the wallet)
+          const ok = useStrategies.getState().spendBudget(strategy.id, strategy.stake);
+          if (!ok) {
+            useStrategies.getState().pause(strategy.id, "budget_exhausted");
+            break;
+          }
+
           const sideLabel = side === "A" ? battle.sideA.label : battle.sideB.label;
-          const ok = useCoinStore.getState().balance >= strategy.stake;
-          if (!ok) break;
-          useCoinStore.getState().spend(strategy.stake);
           useMyEntries.getState().add({
             battleId: battle.id,
             battleTitle: battle.title,
@@ -131,12 +126,8 @@ export function useStrategyExecutor() {
             strategyId: strategy.id,
           });
           useStrategies.getState().recordForecast(strategy.id);
-          // One forecast per strategy per tick to avoid hammering when many candidates match
           break;
         }
-
-        // suppress unused-var lint
-        void myWallet;
       }
     }, 5_000);
 

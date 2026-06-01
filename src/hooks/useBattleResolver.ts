@@ -54,19 +54,21 @@ export function useBattleResolver() {
         const settled = useMyEntries.getState().resolveEntry(entry.battleId, winningSide);
         if (!settled || !settled.result) continue;
 
-        // Credit FINI$ if there's a payout (winners get 2× stake, void/draw refunds 1×)
-        if (settled.result.payout > 0) {
-          useCoinStore.getState().earn(settled.result.payout);
-        }
-
-        // If this forecast came from a Strategy, update the strategy's stats
+        // Route the payout based on where the forecast came from:
+        //  - Strategy-placed: the strategy debited its own budget when the
+        //    forecast was placed, so the payout flows back to the strategy
+        //    (compound or save). NOT to the wallet.
+        //  - Player-placed: wallet gets the payout directly.
         if (entry.strategyId) {
           const outcomeKind = settled.status === "won" ? "win" : settled.status === "lost" ? "loss" : "voided";
           useStrategies.getState().recordOutcome(
             entry.strategyId,
             outcomeKind,
-            settled.result.netProfit,
+            entry.stake,
+            settled.result.payout,
           );
+        } else if (settled.result.payout > 0) {
+          useCoinStore.getState().earn(settled.result.payout);
         }
 
         // Toast (only for manually-placed entries — automated strategies are
