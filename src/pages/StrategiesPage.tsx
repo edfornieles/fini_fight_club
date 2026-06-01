@@ -1,5 +1,5 @@
 /**
- * /strategies — Strategy Lab.
+ * /strategies — Automated Attack.
  *
  * Players deploy autonomous Forecasters with:
  *   - Allocated budget (held by the strategy, segregated from wallet)
@@ -43,7 +43,7 @@ export function StrategiesPage() {
       <div style={{ background: "#fff", borderBottom: "1px solid #f0f0f0", padding: "36px 48px 24px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
           <div>
-            <h1 style={{ fontSize: 30, fontWeight: 900, color: "#111", margin: 0 }}>🧪 Strategy Lab</h1>
+            <h1 style={{ fontSize: 30, fontWeight: 900, color: "#111", margin: 0 }}>⚙️ Automated Attack</h1>
             <p style={{ fontSize: 14, color: "#888", marginTop: 6, marginBottom: 0, fontWeight: 500, maxWidth: 640 }}>
               Deploy autonomous Forecasters that watch the Crypto Arena and place predictions automatically.
               Allocate budget, set stop conditions, choose compound or save mode, and let them run.
@@ -248,7 +248,6 @@ function DeployModal({ onClose }: { onClose: () => void }) {
   const pushNotif = useNotifications(s => s.push);
 
   const [type, setType] = useState<StrategyType>("momentum");
-  const [name, setName] = useState("");
   const [budgetAllocated, setBudgetAllocated] = useState(500);
   const [stake, setStake] = useState(50);
   const [maxPerDay, setMaxPerDay] = useState(20);
@@ -276,7 +275,8 @@ function DeployModal({ onClose }: { onClose: () => void }) {
       alert(`Budget must be at least the per-forecast stake (${stake} FINI$).`);
       return;
     }
-    const finalName = name.trim() || meta.name;
+    // Strategy name auto-derived from the template — no manual input needed
+    const finalName = meta.name;
     const result = create({
       name: finalName,
       type,
@@ -349,10 +349,6 @@ function DeployModal({ onClose }: { onClose: () => void }) {
               );
             })}
           </div>
-        </Field>
-
-        <Field label="Name (optional)">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder={meta.name} style={inputStyle} />
         </Field>
 
         {/* Budget allocation */}

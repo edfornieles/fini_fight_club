@@ -1,5 +1,5 @@
 /**
- * Strategy Lab — autonomous Forecasters with budgets, stop conditions, and
+ * Automated Attack — autonomous Forecasters with budgets, stop conditions, and
  * market-condition awareness.
  *
  * Each Forecaster has its own segregated budget (allocated at deploy time,

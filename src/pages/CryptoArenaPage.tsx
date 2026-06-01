@@ -64,9 +64,9 @@ export function CryptoArenaPage() {
               textDecoration: "none",
               boxShadow: "0 4px 14px rgba(6,182,212,0.25)",
             }}
-              title="Open the Strategy Lab — deploy autonomous Forecasters"
+              title="Deploy autonomous Forecasters that act on your behalf"
             >
-              🧪 Strategy Lab →
+              ⚙️ Automated Attack →
             </Link>
           </div>
 
