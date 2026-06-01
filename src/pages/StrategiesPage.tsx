@@ -134,6 +134,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
   const retire = useStrategies(s => s.retire);
   const earn = useCoinStore(s => s.earn);
   const pushNotif = useNotifications(s => s.push);
+  const [editing, setEditing] = useState(false);
 
   const { wins, losses, voided, totalForecasts, netProfit, forecastsToday } = strategy.stats;
   const settled = wins + losses + voided;
@@ -258,13 +259,21 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
           color: strategy.enabled ? "#666" : "#fff",
           border: "none", fontSize: 12, fontWeight: 800, cursor: "pointer",
         }}>{strategy.enabled ? "⏸ Pause" : "▶ Resume"}</button>
-        <button onClick={() => { if (confirm(`Retire "${strategy.name}"? Remaining budget + saved profits (${(strategy.budget.remaining + strategy.budget.savedProfits).toLocaleString()} FINI$) will be refunded to your wallet.`)) handleRetire(); }} style={{
+        <button onClick={() => setEditing(true)} title="Edit parameters" style={{
+          padding: "8px 14px", borderRadius: 100,
+          background: "transparent", color: "#666",
+          border: "1.5px solid #e5e7eb",
+          fontSize: 12, fontWeight: 700, cursor: "pointer",
+        }}>✏️ Edit</button>
+        <button onClick={() => { if (confirm(`Retire "${strategy.name}"? Remaining budget + saved profits (${(strategy.budget.remaining + strategy.budget.savedProfits).toLocaleString()} FINI$) will be refunded to your wallet.`)) handleRetire(); }} title="Retire and refund" style={{
           padding: "8px 14px", borderRadius: 100,
           background: "transparent", color: "#888",
           border: "1.5px solid #e5e7eb",
           fontSize: 12, fontWeight: 700, cursor: "pointer",
-        }}>🗑 Retire</button>
+        }}>🗑</button>
       </div>
+
+      {editing && <EditStrategyModal strategy={strategy} onClose={() => setEditing(false)} />}
     </div>
   );
 }
@@ -536,6 +545,226 @@ function DeployModal({ onClose }: { onClose: () => void }) {
         }}>🚀 Deploy with {budgetAllocated.toLocaleString()} FINI$</button>
         <div style={{ fontSize: 11, color: "#aaa", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
           Budget is held by the strategy. Retire at any time to refund remaining budget + saved profits to your wallet.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Edit modal — change a deployed strategy's runtime parameters in-place.
+ * Type and allocated budget are NOT editable (changing the type would break
+ * the strategy's identity; changing the budget needs a separate top-up/withdraw
+ * flow). Everything else is fair game: stake, daily cap, reinvest mode,
+ * stop conditions, market condition, asset filter, edge gate, type-specific params.
+ */
+function EditStrategyModal({ strategy, onClose }: { strategy: Strategy; onClose: () => void }) {
+  const update = useStrategies(s => s.update);
+  const meta = STRATEGY_META[strategy.type];
+  const moodMeta = MARKET_CONDITION_META[strategy.marketCondition];
+
+  const [stake, setStake] = useState(strategy.stake);
+  const [maxPerDay, setMaxPerDay] = useState(strategy.maxPerDay);
+  const [reinvest, setReinvest] = useState<ReinvestMode>(strategy.reinvest);
+  const [marketCondition, setMarketCondition] = useState<MarketCondition>(strategy.marketCondition);
+  const [assetFilter, setAssetFilter] = useState<string[]>(strategy.params.assetFilter);
+  const [sideFilter, setSideFilter] = useState<"A" | "B">(strategy.params.sideFilter ?? "A");
+  const [pctThreshold, setPctThreshold] = useState(strategy.params.pctThreshold ?? 40);
+  const [velocityThresholdPct, setVelocityThresholdPct] = useState(
+    strategy.params.velocityThreshold ? strategy.params.velocityThreshold * 100 : 0.5
+  );
+  const [minEdgePp, setMinEdgePp] = useState(strategy.params.minEdgePp ?? 0);
+  const [stopAtNetGain, setStopAtNetGain] = useState<number | "">(strategy.stopConditions.stopAtNetGain ?? "");
+  const [stopAtNetLoss, setStopAtNetLoss] = useState<number | "">(strategy.stopConditions.stopAtNetLoss ?? "");
+
+  const needsSide = strategy.type === "loyalist" || strategy.type === "flat_bias";
+  const needsThreshold = strategy.type === "contrarian";
+  const needsVelocity = strategy.type === "momentum_underlying" || strategy.type === "mean_reversion";
+
+  function save() {
+    update(strategy.id, {
+      stake,
+      maxPerDay,
+      reinvest,
+      marketCondition,
+      params: {
+        assetFilter,
+        ...(needsSide ? { sideFilter } : {}),
+        ...(needsThreshold ? { pctThreshold } : {}),
+        ...(needsVelocity ? { velocityThreshold: velocityThresholdPct / 100 } : {}),
+        ...(minEdgePp > 0 ? { minEdgePp } : {}),
+      },
+      stopConditions: {
+        ...(stopAtNetGain !== "" && stopAtNetGain > 0 ? { stopAtNetGain: Number(stopAtNetGain) } : {}),
+        ...(stopAtNetLoss !== "" && stopAtNetLoss > 0 ? { stopAtNetLoss: Number(stopAtNetLoss) } : {}),
+      },
+    });
+    onClose();
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9100,
+      background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      fontFamily: "'Nunito', system-ui, sans-serif",
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 20, padding: 28,
+        maxWidth: 560, width: "100%",
+        maxHeight: "calc(100vh - 40px)", overflowY: "auto",
+        boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111", margin: 0 }}>Edit {meta.icon} {strategy.name}</h2>
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4, fontWeight: 500 }}>
+              Adjust runtime parameters. Changes apply on the next tick.
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: 22, color: "#888", cursor: "pointer" }}>×</button>
+        </div>
+
+        {/* Read-only summary (these can't be edited) */}
+        <div style={{ background: "#fafafa", borderRadius: 10, padding: "12px 14px", marginBottom: 14, border: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Locked</div>
+          <div style={{ fontSize: 11, color: "#666", lineHeight: 1.6 }}>
+            Strategy: <b style={{ color: "#111" }}>{meta.name}</b> · Budget: <b style={{ color: "#854d0e" }}>{strategy.budget.allocated.toLocaleString()} FINI$</b>{" "}
+            <span style={{ color: "#aaa" }}>({strategy.budget.remaining.toLocaleString()} remaining)</span>
+            <br />
+            <span style={{ fontSize: 10, color: "#aaa" }}>To change these, retire the strategy and deploy a new one.</span>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Capital per forecast">
+            <input type="number" min={10} value={stake} onChange={e => setStake(Math.max(10, Number(e.target.value)))} style={inputStyle} />
+          </Field>
+          <Field label="Max forecasts/day">
+            <input type="number" min={1} value={maxPerDay} onChange={e => setMaxPerDay(Math.max(1, Number(e.target.value)))} style={inputStyle} />
+          </Field>
+        </div>
+
+        <Field label="🛑 Stop conditions (leave blank for no auto-stop)">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 10, color: "#16a34a", fontWeight: 700, marginBottom: 3 }}>🎯 Stop at gain of</div>
+              <input type="number" min={0} placeholder="e.g. 500" value={stopAtNetGain} onChange={e => setStopAtNetGain(e.target.value === "" ? "" : Number(e.target.value))} style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 700, marginBottom: 3 }}>🛑 Stop at loss of</div>
+              <input type="number" min={0} placeholder="e.g. 200" value={stopAtNetLoss} onChange={e => setStopAtNetLoss(e.target.value === "" ? "" : Number(e.target.value))} style={inputStyle} />
+            </div>
+          </div>
+        </Field>
+
+        <Field label="What happens to winnings?">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <button onClick={() => setReinvest("compound")} style={modeBtnStyle(reinvest === "compound", "#06b6d4")}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>♻️ Compound</div>
+              <div style={{ fontSize: 10, color: "#888", marginTop: 3 }}>Wins feed back into the budget. High-risk, high-reward.</div>
+            </button>
+            <button onClick={() => setReinvest("save")} style={modeBtnStyle(reinvest === "save", "#16a34a")}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>💰 Save profits</div>
+              <div style={{ fontSize: 10, color: "#888", marginTop: 3 }}>Stake recycles, profit goes to savings pocket.</div>
+            </button>
+          </div>
+        </Field>
+
+        <Field label="🌐 Market condition required">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {(Object.keys(MARKET_CONDITION_META) as MarketCondition[]).map(mc => {
+              const m = MARKET_CONDITION_META[mc];
+              const active = marketCondition === mc;
+              return (
+                <button key={mc} onClick={() => setMarketCondition(mc)} title={m.description}
+                  style={{
+                    padding: "8px 12px", borderRadius: 100,
+                    background: active ? "#111" : "#fff",
+                    color: active ? "#fff" : "#666",
+                    border: "1.5px solid #e5e7eb",
+                    fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  }}>{m.icon} {m.label}</button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 10, color: "#aaa", marginTop: 4, lineHeight: 1.5 }}>
+            {moodMeta.description}
+          </div>
+        </Field>
+
+        {needsSide && (
+          <Field label="Always pick side">
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["A", "B"] as const).map(s => (
+                <button key={s} onClick={() => setSideFilter(s)} style={{
+                  flex: 1, padding: "10px", borderRadius: 8,
+                  background: sideFilter === s ? "#111" : "#fff",
+                  color: sideFilter === s ? "#fff" : "#666",
+                  border: "1.5px solid #e5e7eb",
+                  fontSize: 13, fontWeight: 700, cursor: "pointer",
+                }}>{s === "A" ? "Side A (Up / first)" : "Side B (Down / second)"}</button>
+              ))}
+            </div>
+          </Field>
+        )}
+        {needsThreshold && (
+          <Field label="Underdog threshold">
+            <input type="range" min={20} max={49} value={pctThreshold} onChange={e => setPctThreshold(Number(e.target.value))} style={{ width: "100%" }} />
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Trigger when one side falls below <b style={{ color: "#111" }}>{pctThreshold}%</b></div>
+          </Field>
+        )}
+        {needsVelocity && (
+          <Field label={strategy.type === "mean_reversion" ? "Overshoot threshold" : "Velocity threshold"}>
+            <input type="range" min={0.1} max={5} step={0.1} value={velocityThresholdPct} onChange={e => setVelocityThresholdPct(Number(e.target.value))} style={{ width: "100%" }} />
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+              {strategy.type === "mean_reversion"
+                ? <>Fire when 1m move exceeds <b style={{ color: "#111" }}>±{velocityThresholdPct}%</b></>
+                : <>Fire when 5m velocity is above <b style={{ color: "#111" }}>+{velocityThresholdPct}%</b> (Up) or below <b style={{ color: "#111" }}>-{velocityThresholdPct}%</b> (Down)</>}
+            </div>
+          </Field>
+        )}
+
+        <Field label="🎯 Edge gate (only fire when our model beats market by this many pp)">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="range" min={0} max={25} step={1} value={minEdgePp} onChange={e => setMinEdgePp(Number(e.target.value))} style={{ flex: 1 }} />
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#111", minWidth: 60, textAlign: "right" }}>
+              {minEdgePp === 0 ? "OFF" : `${minEdgePp}pp`}
+            </span>
+          </div>
+        </Field>
+
+        <Field label="Assets to watch (empty = all)">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {SUPPORTED_ASSETS.map(a => {
+              const active = assetFilter.includes(a);
+              return (
+                <button key={a} onClick={() => setAssetFilter(active ? assetFilter.filter(x => x !== a) : [...assetFilter, a])} style={{
+                  padding: "6px 12px", borderRadius: 100,
+                  background: active ? "#111" : "#fff",
+                  color: active ? "#fff" : "#666",
+                  border: "1.5px solid #e5e7eb",
+                  fontSize: 11, fontWeight: 700, cursor: "pointer",
+                }}>{a}</button>
+              );
+            })}
+          </div>
+        </Field>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button onClick={onClose} style={{
+            flex: 1,
+            background: "#fff", color: "#666",
+            border: "1.5px solid #e5e7eb", borderRadius: 100,
+            padding: "12px 0", fontSize: 13, fontWeight: 700, cursor: "pointer",
+          }}>Cancel</button>
+          <button onClick={save} style={{
+            flex: 2,
+            background: "linear-gradient(135deg, #f472b6, #ec4899)", color: "#fff",
+            border: "none", borderRadius: 100, padding: "12px 0",
+            fontSize: 14, fontWeight: 900, cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(244,114,182,0.30)",
+          }}>💾 Save changes</button>
         </div>
       </div>
     </div>
