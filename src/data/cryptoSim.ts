@@ -140,6 +140,19 @@ let lastTickId = 0;
 // for fair-odds calculations without re-anchoring every tick.
 const battleEndsAt = new Map<string, number>();
 
+/**
+ * Real epoch-ms resolution time for a battle, anchored once when the sim first
+ * sees it. Falls back to now + endsInMs if not yet anchored. Used by the live
+ * cards to tick a real countdown.
+ */
+export function battleEndsAtMs(id: string, fallbackEndsInMs: number): number {
+  const t = battleEndsAt.get(id);
+  if (t != null) return t;
+  const anchored = Date.now() + fallbackEndsInMs;
+  battleEndsAt.set(id, anchored);
+  return anchored;
+}
+
 const shortWallet = (a: string) => a.length >= 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 
 export const useCryptoSim = create<SimState>((set, get) => ({

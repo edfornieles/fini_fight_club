@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Battle } from "../data/mockBattles";
+import { battleEndsAtMs } from "../data/cryptoSim";
 
 export type { BattleStatus, BattleType, Battle } from "../data/mockBattles";
 
@@ -12,12 +14,21 @@ const ASSET_COLORS: Record<string, string> = {
 function fmtTime(ms: number): string {
   if (ms <= 0) return "Ended";
   const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ${m % 60}m`;
+  // Under an hour: live mm:ss countdown so it visibly ticks every second.
+  if (h < 1) return `${m}:${String(s % 60).padStart(2, "0")}`;
+  if (h < 24) return `${h}h ${String(m % 60).padStart(2, "0")}m`;
   return `${Math.floor(h / 24)}d`;
+}
+
+/** 1-second clock tick — shared so all cards re-render together each second. */
+function useSecondTick() {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setN(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 }
 
 function StatusChip({ status, endsInMs }: { status: string; endsInMs: number }) {
@@ -36,6 +47,11 @@ function StatusChip({ status, endsInMs }: { status: string; endsInMs: number }) 
 export function BattleCard({ battle }: { battle: Battle }) {
   const navigate = useNavigate();
   const { sideA, sideB } = battle;
+  useSecondTick(); // re-render every second so the countdown ticks
+  // Live remaining time from the battle's real anchored end time.
+  const remaining = battle.status === "live" || battle.status === "upcoming"
+    ? Math.max(0, battleEndsAtMs(battle.id, battle.endsInMs) - Date.now())
+    : battle.endsInMs;
 
   return (
     <div onClick={() => navigate(`/battle/${battle.id}`)} style={{
@@ -62,7 +78,7 @@ export function BattleCard({ battle }: { battle: Battle }) {
           </>
         )}
         <div style={{ position: "absolute", top: 8, left: 8 }}>
-          <StatusChip status={battle.status} endsInMs={battle.endsInMs} />
+          <StatusChip status={battle.status} endsInMs={remaining} />
         </div>
         <div style={{ position: "absolute", top: 8, right: 8, fontSize: 10, fontWeight: 700, color: "#aaa", background: "rgba(255,255,255,0.85)", padding: "2px 7px", borderRadius: 6 }}>
           {battle.durationLabel}
@@ -106,7 +122,7 @@ export function BattleCard({ battle }: { battle: Battle }) {
           </div>
           <div style={{ display: "flex", gap: 8, fontSize: 11, color: "#aaa", fontWeight: 600 }}>
             <span>🪙 {battle.volumeK}K</span>
-            {battle.endsInMs > 0 && <span>⏱ {fmtTime(battle.endsInMs)}</span>}
+            {remaining > 0 && <span style={{ fontVariantNumeric: "tabular-nums" }}>⏱ {fmtTime(remaining)}</span>}
           </div>
         </div>
       </div>
