@@ -2,8 +2,41 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Battle } from "../data/mockBattles";
 import { battleEndsAtMs } from "../data/cryptoSim";
+import { getCachedPrices } from "../lib/priceProviders";
+import { priceSeries } from "../lib/velocity";
+import { seedHistoryFor } from "../lib/historicalPrices";
 
 export type { BattleStatus, BattleType, Battle } from "../data/mockBattles";
+
+/** Compact price sparkline — last ~6h of movement, coloured by direction. */
+function MiniSparkline({ asset }: { asset: string }) {
+  const series = priceSeries(asset, 6 * 60 * 60 * 1000);
+  if (series.length < 2) {
+    return <div style={{ width: 64, height: 24 }} />;
+  }
+  const prices = series.map(s => s.price);
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const span = max - min || 1;
+  const W = 64, H = 24, pad = 2;
+  const pts = series.map((s, i) => {
+    const x = pad + (i / (series.length - 1)) * (W - 2 * pad);
+    const y = pad + (1 - (s.price - min) / span) * (H - 2 * pad);
+    return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(" ");
+  const up = prices[prices.length - 1] >= prices[0];
+  const stroke = up ? "#16a34a" : "#dc2626";
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      <path d={pts} fill="none" stroke={stroke} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function fmtPrice(n: number): string {
+  if (n >= 1000) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (n >= 1) return "$" + n.toFixed(2);
+  return "$" + n.toFixed(4);
+}
 
 const ASSET_COLORS: Record<string, string> = {
   BTC: "#f7931a", ETH: "#627eea", SOL: "#9945ff", DOGE: "#c3a634",
@@ -47,7 +80,12 @@ function StatusChip({ status, endsInMs }: { status: string; endsInMs: number }) 
 export function BattleCard({ battle }: { battle: Battle }) {
   const navigate = useNavigate();
   const { sideA, sideB } = battle;
-  useSecondTick(); // re-render every second so the countdown ticks
+  useSecondTick(); // re-render every second so the countdown ticks + sparkline updates
+  // Seed real recent price history once so the sparklines have a curve to draw.
+  useEffect(() => {
+    battle.assets.forEach(a => { void seedHistoryFor(a); });
+  }, [battle.assets]);
+  const prices = getCachedPrices();
   // Live remaining time from the battle's real anchored end time.
   const remaining = battle.status === "live" || battle.status === "upcoming"
     ? Math.max(0, battleEndsAtMs(battle.id, battle.endsInMs) - Date.now())
@@ -90,6 +128,32 @@ export function BattleCard({ battle }: { battle: Battle }) {
         <div>
           <div style={{ fontSize: 13, fontWeight: 800, color: "#111", lineHeight: 1.3 }}>{battle.title}</div>
           <div style={{ fontSize: 11, color: "#888", marginTop: 3, lineHeight: 1.4 }}>{battle.question}</div>
+        </div>
+
+        {/* Live price strip — real price + 24h % + sparkline per asset */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {battle.assets.map(a => {
+            const p = prices?.[a];
+            const chg = p?.usd_24h_change ?? null;
+            const up = (chg ?? 0) >= 0;
+            return (
+              <div key={a} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: ASSET_COLORS[a] ?? "#888", display: "inline-block", flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#111" }}>{a}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#555", fontVariantNumeric: "tabular-nums" }}>
+                    {p?.usd ? fmtPrice(p.usd) : "—"}
+                  </span>
+                  {chg != null && (
+                    <span style={{ fontSize: 10, fontWeight: 800, color: up ? "#16a34a" : "#dc2626" }}>
+                      {up ? "▲" : "▼"}{Math.abs(chg).toFixed(2)}%
+                    </span>
+                  )}
+                </div>
+                <MiniSparkline asset={a} />
+              </div>
+            );
+          })}
         </div>
 
         {/* Probability bar */}
