@@ -46,7 +46,6 @@ export function SiteNav() {
       <div style={{ display: "flex", alignItems: "center", gap: 24, fontSize: 14, fontWeight: 600, color: "#111", whiteSpace: "nowrap" }}>
         <NavLink to="/crypto" dot="#60a5fa" label="Crypto Arena" />
         <NavLink to="/fight-club" dot="#4ade80" label="Fight Club" />
-        <NavLink to="/strategies" dot="#06b6d4" label="Strategies" />
         <NavLink to="/leaderboard" dot="#f97316" label="Leaderboard" />
         <NavLink to="/claim" dot="#a78bfa" label="Claim FINI$" />
       </div>

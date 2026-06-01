@@ -55,6 +55,19 @@ export function CryptoArenaPage() {
             <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: "#dcfce7", color: "#15803d" }}>
               {liveCount} Live
             </span>
+            <Link to="/strategies" style={{
+              marginLeft: "auto",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 16px", borderRadius: 100,
+              background: "linear-gradient(135deg, #06b6d4, #0891b2)",
+              color: "#fff", fontSize: 13, fontWeight: 800,
+              textDecoration: "none",
+              boxShadow: "0 4px 14px rgba(6,182,212,0.25)",
+            }}
+              title="Open the Strategy Lab — deploy autonomous Forecasters"
+            >
+              🧪 Strategy Lab →
+            </Link>
           </div>
 
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
