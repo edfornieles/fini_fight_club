@@ -32,6 +32,13 @@ function MiniSparkline({ asset }: { asset: string }) {
   );
 }
 
+function parseDurationLabel(label?: string): number {
+  if (!label) return 60 * 60 * 1000;
+  const m = /^(\d+)(m|h)$/.exec(label.trim());
+  if (!m) return 60 * 60 * 1000;
+  return Number(m[1]) * (m[2] === "h" ? 3_600_000 : 60_000);
+}
+
 function fmtPrice(n: number): string {
   if (n >= 1000) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
   if (n >= 1) return "$" + n.toFixed(2);
@@ -86,10 +93,19 @@ export function BattleCard({ battle }: { battle: Battle }) {
     battle.assets.forEach(a => { void seedHistoryFor(a); });
   }, [battle.assets]);
   const prices = getCachedPrices();
-  // Live remaining time from the battle's real anchored end time.
-  const remaining = battle.status === "live" || battle.status === "upcoming"
-    ? Math.max(0, battleEndsAtMs(battle.id, battle.endsInMs) - Date.now())
-    : battle.endsInMs;
+  // Live timing from the battle's real anchored end time.
+  const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
+  const durMs = parseDurationLabel(battle.durationLabel);
+  const startsAt = endsAt - durMs;
+  const now = Date.now();
+  const msToStart = startsAt - now;          // >0 → hasn't started yet
+  const msToEnd = Math.max(0, endsAt - now); // time until resolution
+  // Upcoming battles count down to START; live battles count down to END.
+  const phase: "pre" | "live" | "ended" =
+    battle.status === "upcoming" && msToStart > 0 ? "pre"
+    : msToEnd > 0 ? "live"
+    : "ended";
+  const remaining = phase === "pre" ? msToStart : msToEnd;
 
   return (
     <div onClick={() => navigate(`/battle/${battle.id}`)} style={{
@@ -116,7 +132,7 @@ export function BattleCard({ battle }: { battle: Battle }) {
           </>
         )}
         <div style={{ position: "absolute", top: 8, left: 8 }}>
-          <StatusChip status={battle.status} endsInMs={remaining} />
+          <StatusChip status={phase === "pre" ? "upcoming" : phase === "live" ? "live" : battle.status} endsInMs={phase === "live" ? remaining : 999999999} />
         </div>
         <div style={{ position: "absolute", top: 8, right: 8, fontSize: 10, fontWeight: 700, color: "#aaa", background: "rgba(255,255,255,0.85)", padding: "2px 7px", borderRadius: 6 }}>
           {battle.durationLabel}
@@ -186,7 +202,8 @@ export function BattleCard({ battle }: { battle: Battle }) {
           </div>
           <div style={{ display: "flex", gap: 8, fontSize: 11, color: "#aaa", fontWeight: 600 }}>
             <span>🪙 {battle.volumeK}K</span>
-            {remaining > 0 && <span style={{ fontVariantNumeric: "tabular-nums" }}>⏱ {fmtTime(remaining)}</span>}
+            {phase === "pre" && <span style={{ fontVariantNumeric: "tabular-nums", color: "#1d4ed8", fontWeight: 700 }}>🚦 starts {fmtTime(remaining)}</span>}
+            {phase === "live" && <span style={{ fontVariantNumeric: "tabular-nums" }}>⏱ ends {fmtTime(remaining)}</span>}
           </div>
         </div>
       </div>

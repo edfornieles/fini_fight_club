@@ -229,11 +229,11 @@ export function BattlePage() {
             <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Battle Rules</div>
               <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7, fontWeight: 500 }}>
-                Resolution source: CoinGecko API (primary) + Coinbase and Binance (backup), server-side only.<br />
-                Entry cutoff: 30 seconds before battle end. No late entries accepted.<br />
-                Prices, winners, and payouts are determined server-side. The client cannot submit any of these values.<br />
-                If primary and backup prices deviate by more than 50bps, the battle is held for manual review.<br />
-                If no price can be verified, the battle is voided and all entries are returned in full.
+                <b>Price source.</b> Every price is the median of three feeds — CoinGecko, Coinbase, and Binance — so no single source can skew a result.<br />
+                <b>Winner.</b> Decided purely by the price move over the window (see the rule at the top of this page). Every battle resolves to a clear winner — there are no ties or voids.<br />
+                <b>Payout.</b> Winners are paid from the prize pool in proportion to the odds when they entered — back an underdog and you earn more; back a favourite and you earn less.<br />
+                <b>Sell anytime.</b> You can cash out a position before the battle ends at its current market value, to lock in a gain or cut a loss.<br />
+                <b>Play-money beta.</b> FINI$ is an in-game currency with no real-world value. Prices may be delayed; this is a game, not a trading tool.
               </div>
             </div>
 
