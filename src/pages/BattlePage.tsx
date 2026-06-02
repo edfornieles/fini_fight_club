@@ -129,7 +129,13 @@ export function BattlePage() {
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  const remainingMs = Math.max(0, endsAt - nowMs);
+  // If the player's entry on this battle has already settled, the battle is
+  // effectively over for them — clamp remaining to 0 so the page can't show
+  // "Resolution in 1h 57m" next to a "🎉 You won" status. (Mock battles in
+  // particular have stale hardcoded endsInMs that can lag the real outcome.)
+  const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle.id));
+  const playerSettled = playerEntry && playerEntry.status !== "open";
+  const remainingMs = playerSettled ? 0 : Math.max(0, endsAt - nowMs);
 
   function fmtTime(ms: number) {
     if (ms <= 0) return "Resolving…";
