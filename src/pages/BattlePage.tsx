@@ -10,6 +10,7 @@ import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
 import { WinnerBanner } from "../components/WinnerBanner";
 import { RelatedMarkets } from "../components/RelatedMarkets";
+import { useLiveActivity, getBattleVolume } from "../hooks/useLiveActivity";
 import { useLivePrices } from "../hooks/useLivePrices";
 import { useCryptoSim, useSimBattles, useSimFeed, battleEndsAtMs } from "../data/cryptoSim";
 import { personaFor } from "../lib/ghostPersonas";
@@ -135,6 +136,18 @@ export function BattlePage() {
   // "Resolution in 1h 57m" next to a "🎉 You won" status. (Mock battles in
   // particular have stale hardcoded endsInMs that can lag the real outcome.)
   const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle.id));
+  // Real volume for THIS battle from Supabase — sum of every stake placed
+  // (bots + real players). Refreshes every 12s so it tracks live activity.
+  const [realVolume, setRealVolume] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      getBattleVolume(battle.id, 8_000).then(v => { if (alive) setRealVolume(v); });
+    };
+    refresh();
+    const t = setInterval(refresh, 12_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [battle.id]);
   const playerSettled = playerEntry && playerEntry.status !== "open";
   const remainingMs = playerSettled ? 0 : Math.max(0, endsAt - nowMs);
 
@@ -283,7 +296,13 @@ export function BattlePage() {
                 <div style={{ height: "100%", width: `${sideA.pct}%`, background: "linear-gradient(90deg, #22c55e, #16a34a)", borderRadius: 100 }} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 8 }}>
-                <StatBox label="Volume" value={`${battle.volumeK}K`} sub="Fini Coin" />
+                <StatBox
+                  label="Volume"
+                  value={realVolume != null
+                    ? realVolume >= 1000 ? `${Math.round(realVolume / 1000)}K` : `${realVolume}`
+                    : "—"}
+                  sub="FINI$ wagered"
+                />
                 <StatBox
                   label="Time Left"
                   value={
@@ -784,7 +803,10 @@ function BattleArenaHero({
  *   - Resolution: when ended, the final price + winner
  */
 function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: string; sideA: { label: string }; sideB: { label: string }; durationLabel: string; endsInMs: number } }) {
-  const feed = useSimFeed();
+  // Real Supabase predictions on this battle (replaces the synthetic feed).
+  // Falls back to local sim if Supabase is offline.
+  const { events: liveEvents } = useLiveActivity({ battleId: battle.id, limit: 8, pollMs: 6000 });
+  const simFeed = useSimFeed();
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 2000);
@@ -819,8 +841,17 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
   };
   const ago = (ts: number) => { const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return `${s}s ago`; const m = Math.floor(s/60); return `${m}m ago`; };
 
-  // Recent real predictions on this battle (newest first), cap 6
-  const battleBets = feed.filter(f => f.battleId === battle.id).slice(0, 6);
+  // Recent real predictions on this battle (newest first), capped.
+  // Source: Supabase predictions table via useLiveActivity. If that's
+  // empty or offline, fall back to the local sim feed so the UI still has
+  // signs of life during dev / offline.
+  type FeedItem = { id: string | number; handle: string; isBot: boolean; side: "A" | "B"; stake: number; at: number };
+  const battleBets: FeedItem[] = liveEvents.length > 0
+    ? liveEvents.map(e => ({ id: e.id, handle: e.handle, isBot: e.isBot, side: e.side, stake: e.stake, at: e.at }))
+    : simFeed.filter(f => f.battleId === battle.id).slice(0, 6).map(f => ({
+        id: f.id, handle: personaFor(f.wallet).handle, isBot: false,
+        side: f.side, stake: f.amount, at: f.at,
+      }));
 
   type LogRow = { ts: number; tone: "open" | "bet" | "info" | "result"; text: string };
   const rows: LogRow[] = [];
@@ -867,18 +898,21 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
           </div>
         ))}
 
-        {/* Real prediction feed for this battle */}
+        {/* Live prediction feed for this battle (real data from Supabase) */}
         {battleBets.length > 0 && (
           <div style={{ borderTop: "1px solid #f3f4f6", marginTop: 4, paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent predictions</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em" }}>Recent predictions</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#16a34a" }}>● live</div>
+            </div>
             {battleBets.map(b => {
-              const p = personaFor(b.wallet);
               const sideColor = b.side === "A" ? "#16a34a" : "#dc2626";
+              const sideLabel = b.side === "A" ? battle.sideA.label : battle.sideB.label;
               return (
                 <div key={b.id} style={{ display: "flex", gap: 10, fontSize: 13, alignItems: "baseline" }}>
                   <span style={{ fontFamily: "monospace", color: "#bbb", flexShrink: 0, fontSize: 11 }}>{ago(b.at)}</span>
                   <span style={{ color: "#333", fontWeight: 600 }}>
-                    {p.tierIcon} <b>{p.handle}</b> backed <b style={{ color: sideColor }}>{b.sideLabel}</b> with {b.amount.toLocaleString()} FINI$
+                    {b.isBot ? "🤖" : "👤"} <b style={{ fontFamily: b.isBot ? "inherit" : "monospace" }}>{b.handle}</b> backed <b style={{ color: sideColor }}>{sideLabel}</b> with {b.stake.toLocaleString()} FINI$
                   </span>
                 </div>
               );
