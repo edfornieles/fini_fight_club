@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUIStore } from "../state/uiStore";
 import { Link } from "react-router-dom";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
+import { ActivityHub } from "../components/ActivityHub";
 
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
@@ -68,6 +69,12 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* Primary content: forecast track record — the player's own activity */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 48px 0" }}>
+        <ActivityHub />
+      </div>
+
+      {/* Secondary: account settings + avatar etc. */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 48px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
 
         {/* Left: editable profile info */}
