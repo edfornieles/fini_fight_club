@@ -30,10 +30,10 @@ const upDownBattles: Battle[] = [
   { id: "sol-updown-1h",   title: "SOL Up or Down Hourly", question: "Will SOL close higher than its opening price this hour?",                type: "updown", status: "live",     assets: ["SOL"],  sideA: { label: "Up", pct: 61, color: "#22c55e" }, sideB: { label: "Down", pct: 39, color: "#ef4444" }, volumeK: 41,  endsInMs: 51*M,      familyA: "SOL",durationLabel: "1h"  },
   { id: "doge-updown-1h",  title: "DOGE Up or Down Hourly",question: "Will DOGE close higher than its opening price this hour?",               type: "updown", status: "live",     assets: ["DOGE"], sideA: { label: "Up", pct: 67, color: "#22c55e" }, sideB: { label: "Down", pct: 33, color: "#ef4444" }, volumeK: 54,  endsInMs: 41*M,      familyA: "DOGE", durationLabel: "1h"  },
   { id: "bnb-updown-1h",   title: "BNB Up or Down Hourly", question: "Will BNB close higher than its opening price this hour?",                type: "updown", status: "live",     assets: ["BNB"],  sideA: { label: "Up", pct: 52, color: "#22c55e" }, sideB: { label: "Down", pct: 48, color: "#ef4444" }, volumeK: 29,  endsInMs: 11*H,      familyA: "BNB",    durationLabel: "1h"  },
-  { id: "link-updown-1h",  title: "LINK Up or Down Hourly",question: "Will LINK close higher than its opening price this hour?",               type: "updown", status: "upcoming", assets: ["LINK"], sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 12,  endsInMs: H+20*M,    familyA: "LINK", durationLabel: "1h"  },
-  { id: "avax-updown-1h",  title: "AVAX Up or Down Hourly",question: "Will AVAX close higher than its opening price this hour?",               type: "updown", status: "upcoming", assets: ["AVAX"], sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 9,   endsInMs: H+35*M,    familyA: "AVAX", durationLabel: "1h"  },
-  { id: "matic-updown-1h", title: "MATIC Up or Down Hourly",question: "Will MATIC close higher than its opening price this hour?",             type: "updown", status: "upcoming", assets: ["MATIC"],sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 8,   endsInMs: H+50*M,    familyA: "MATIC",durationLabel: "1h"  },
-  { id: "uni-updown-1h",   title: "UNI Up or Down Hourly", question: "Will UNI close higher than its opening price this hour?",                type: "updown", status: "upcoming", assets: ["UNI"],  sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 7,   endsInMs: 2*H,       familyA: "UNI", durationLabel: "1h"  },
+  { id: "link-updown-1h",  title: "LINK Up or Down Hourly",question: "Will LINK close higher than its opening price this hour?",               type: "updown", status: "live", assets: ["LINK"], sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 12,  endsInMs: H+20*M,    familyA: "LINK", durationLabel: "1h"  },
+  { id: "avax-updown-1h",  title: "AVAX Up or Down Hourly",question: "Will AVAX close higher than its opening price this hour?",               type: "updown", status: "live", assets: ["AVAX"], sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 9,   endsInMs: H+35*M,    familyA: "AVAX", durationLabel: "1h"  },
+  { id: "matic-updown-1h", title: "MATIC Up or Down Hourly",question: "Will MATIC close higher than its opening price this hour?",             type: "updown", status: "live", assets: ["MATIC"],sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 8,   endsInMs: H+50*M,    familyA: "MATIC",durationLabel: "1h"  },
+  { id: "uni-updown-1h",   title: "UNI Up or Down Hourly", question: "Will UNI close higher than its opening price this hour?",                type: "updown", status: "live", assets: ["UNI"],  sideA: { label: "Up", pct: 50, color: "#22c55e" }, sideB: { label: "Down", pct: 50, color: "#ef4444" }, volumeK: 7,   endsInMs: 2*H,       familyA: "UNI", durationLabel: "1h"  },
 ];
 
 // Every coin vs every other coin (outperform) — 2h window
@@ -63,7 +63,9 @@ for (let i = 0; i < COINS.length; i++) {
   for (let j = i + 1; j < COINS.length; j++) {
     const a = COINS[i], b = COINS[j];
     const pctA = seedPct(a, b);
-    const status: BattleStatus = idx < 6 ? "live" : idx < 12 ? "upcoming" : "upcoming";
+    // Every battle in a recurring series is always live until it ends —
+    // there's no waiting state. The next round spawns the moment one closes.
+    const status: BattleStatus = "live";
     outperformBattles.push({
       id: `${a.toLowerCase()}-vs-${b.toLowerCase()}-2h`,
       title: `${FAMILIES[a]} vs ${FAMILIES[b]}`,
