@@ -452,7 +452,7 @@ function BalanceDisplay() {
 function BattleArenaHero({
   battle, endsAt, remainingMs, sideALabel, sideBLabel, sideAPct, sideBPct, color, userBet,
 }: {
-  battle: { endsInMs: number; assets: string[]; familyA?: string; familyB?: string; durationLabel?: string };
+  battle: { id: string; endsInMs: number; assets: string[]; familyA?: string; familyB?: string; durationLabel?: string };
   endsAt: number;        // shared anchored end time (single source of truth)
   remainingMs: number;   // shared live remaining ms (ticks from parent)
   sideALabel: string; sideBLabel: string;
@@ -488,6 +488,13 @@ function BattleArenaHero({
   const placed = !!userBet;
   // After prediction: bigger, more dramatic. Before: compact intro.
   const minH = placed ? 480 : 260;
+
+  // Read the live entry status from store — so the hero footer flips from
+  // "Awaiting price oracle" to "🎉 Won" / "💀 Lost" / "↩️ Voided" / "💸 Sold"
+  // the moment useBattleResolver settles it. Without this the UI stayed
+  // stuck on "Awaiting price oracle" forever.
+  const entry = useMyEntries(s => s.entries.find(e => e.battleId === battle.id));
+  const settled = entry && entry.status !== "open" ? entry : null;
 
   return (
     <div style={{
@@ -546,8 +553,18 @@ function BattleArenaHero({
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Status</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: remaining > 0 ? "#16a34a" : "#a855f7" }}>
-              {remaining > 0 ? "● Battle in progress" : "⚖️ Awaiting price oracle"}
+            <div style={{
+              fontSize: 13, fontWeight: 800,
+              color: settled?.status === "won" ? "#16a34a"
+                : settled?.status === "lost" ? "#dc2626"
+                : settled?.status === "voided" || settled?.status === "sold" ? "#a855f7"
+                : remaining > 0 ? "#16a34a" : "#a855f7",
+            }}>
+              {settled?.status === "won" ? `🎉 You won — payout ${settled.result?.payout?.toLocaleString() ?? 0} FINI$`
+                : settled?.status === "lost" ? `💀 Lost ${settled.stake} FINI$`
+                : settled?.status === "voided" ? `↩️ Voided — ${settled.stake} FINI$ refunded`
+                : settled?.status === "sold" ? `💸 Sold early for ${settled.soldFor?.toLocaleString() ?? 0} FINI$`
+                : remaining > 0 ? "● Battle in progress" : "⚖️ Awaiting price oracle"}
             </div>
           </div>
         </div>
@@ -561,9 +578,21 @@ function BattleArenaHero({
         </div>
         {placed && userBet && (
           <div style={{ marginTop: 10, fontSize: 12, color: "#666", fontWeight: 600 }}>
-            You staked <b style={{ color: "#111" }}>{userBet.stake} FINI$</b> on <b style={{ color: userBet.side === "A" ? "#16a34a" : "#dc2626" }}>
-              {userBet.side === "A" ? sideALabel : sideBLabel}
-            </b>. Sit tight — payout settles when the timer hits zero.
+            {settled ? (
+              settled.status === "won" ? (
+                <>You staked <b>{userBet.stake} FINI$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — won <b style={{ color: "#16a34a" }}>{settled.result?.payout?.toLocaleString() ?? 0} FINI$</b> (net <b style={{ color: "#16a34a" }}>+{(settled.result?.netProfit ?? 0).toLocaleString()}</b>).</>
+              ) : settled.status === "lost" ? (
+                <>You staked <b>{userBet.stake} FINI$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — lost. Better luck next round.</>
+              ) : settled.status === "voided" ? (
+                <>You staked <b>{userBet.stake} FINI$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — voided, full refund.</>
+              ) : settled.status === "sold" ? (
+                <>You sold this position early for <b style={{ color: "#a855f7" }}>{settled.soldFor?.toLocaleString() ?? 0} FINI$</b>.</>
+              ) : null
+            ) : (
+              <>You staked <b style={{ color: "#111" }}>{userBet.stake} FINI$</b> on <b style={{ color: userBet.side === "A" ? "#16a34a" : "#dc2626" }}>
+                {userBet.side === "A" ? sideALabel : sideBLabel}
+              </b>. Sit tight — payout settles when the timer hits zero.</>
+            )}
           </div>
         )}
       </div>
