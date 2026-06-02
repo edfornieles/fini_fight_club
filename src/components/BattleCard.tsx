@@ -180,14 +180,27 @@ export function BattleCard({ battle }: { battle: Battle }) {
           </div>
         </div>
 
-        {/* Buttons */}
+        {/* Side buttons — show the projected payout for a 100 FINI$ stake so
+            the player sees the value of each side without doing the math. */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-          <button onClick={e => e.stopPropagation()} style={{ padding: "7px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 800, background: "#dcfce7", color: "#15803d" }}>
-            {sideA.label} <span style={{ opacity: 0.7 }}>{sideA.pct}%</span>
-          </button>
-          <button onClick={e => e.stopPropagation()} style={{ padding: "7px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 800, background: "#fee2e2", color: "#dc2626" }}>
-            {sideB.label} <span style={{ opacity: 0.7 }}>{sideB.pct}%</span>
-          </button>
+          {[
+            { label: sideA.label, pct: sideA.pct, bg: "#dcfce7", fg: "#15803d", sub: "#16a34a" },
+            { label: sideB.label, pct: sideB.pct, bg: "#fee2e2", fg: "#dc2626", sub: "#dc2626" },
+          ].map(side => {
+            const winFor100 = side.pct > 0 ? Math.round(10000 / side.pct) : 0;
+            return (
+              <button key={side.label} onClick={e => e.stopPropagation()} style={{
+                padding: "6px 0", borderRadius: 10, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 800, background: side.bg, color: side.fg,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              }}>
+                <span>{side.label} <span style={{ opacity: 0.7 }}>{side.pct}%</span></span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: side.sub, opacity: 0.9 }}>
+                  100 → {winFor100.toLocaleString()}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Footer */}

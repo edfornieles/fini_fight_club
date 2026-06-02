@@ -9,6 +9,7 @@ import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
 import { WinnerBanner } from "../components/WinnerBanner";
+import { RelatedMarkets } from "../components/RelatedMarkets";
 import { useLivePrices } from "../hooks/useLivePrices";
 import { useCryptoSim, useSimBattles, useSimFeed, battleEndsAtMs } from "../data/cryptoSim";
 import { personaFor } from "../lib/ghostPersonas";
@@ -343,18 +344,37 @@ export function BattlePage() {
                 <SideBtn label={sideB.label} pct={sideB.pct} side="B" selected={selectedSide === "B"} color="#dc2626" bg="#fee2e2" onSelect={() => setSelectedSide("B")} />
               </div>
 
-              {/* Amount */}
+              {/* Amount — chips show the projected win for the selected side
+                  so the player sees the payout without doing the math. */}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", marginBottom: 8 }}>FINI$ amount</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa" }}>FINI$ amount</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb" }}>
+                    {selectedSide ? `win at ${selectedSide === "A" ? sideA.pct : sideB.pct}%` : "pick a side to preview win"}
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  {["50", "100", "250", "500"].map(v => (
-                    <button key={v} onClick={() => setStake(v)} style={{
-                      flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: 700,
-                      background: stake === v ? "#111" : "#f3f4f6",
-                      color: stake === v ? "#fff" : "#666",
-                    }}>{v}</button>
-                  ))}
+                  {["50", "100", "250", "500"].map(v => {
+                    const n = Number(v);
+                    const win = selectedSide ? Math.round(n * 100 / (selectedSide === "A" ? sideA.pct : sideB.pct)) : null;
+                    const active = stake === v;
+                    return (
+                      <button key={v} onClick={() => setStake(v)} style={{
+                        flex: 1, padding: "8px 4px", borderRadius: 10, border: "none", cursor: "pointer",
+                        fontSize: 12, fontWeight: 700,
+                        background: active ? "#111" : "#f3f4f6",
+                        color: active ? "#fff" : "#666",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                      }}>
+                        <span>{v}</span>
+                        {win != null && (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: active ? "#86efac" : "#16a34a" }}>
+                            win {win.toLocaleString()}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <input
                   type="number" value={stake} onChange={e => setStake(e.target.value)}
@@ -477,6 +497,11 @@ export function BattlePage() {
               <div style={{ fontSize: 11, color: "#bbb", textAlign: "center", lineHeight: 1.5 }}>
                 Fini Coin is a non-transferable in-game currency. No real-world value.
               </div>
+            </div>
+
+            {/* Related markets — one-click hop to equivalent or adjacent rounds. */}
+            <div style={{ marginTop: 16 }}>
+              <RelatedMarkets currentBattleId={battle.id} />
             </div>
           </div>
         </div>
