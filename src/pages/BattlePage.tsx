@@ -181,12 +181,16 @@ export function BattlePage() {
             </div>
 
             {/* Winner declaration + next-round CTA — Polymarket-style continuity.
-                Renders only when the battle has settled (timer hit zero). */}
+                Renders only when the battle has settled (timer hit zero).
+                When the server audit is in manual_review / pending / voided,
+                WinnerBanner suppresses itself so the Resolution Audit panel
+                below speaks authoritatively (no contradictory headlines). */}
             {remainingMs <= 0 && (
               <WinnerBanner
                 battle={battle}
                 userBetSide={predictResult && predictResult.ok ? predictResult.side : null}
                 userPayout={useMyEntries.getState().entries.find(e => e.battleId === battle.id)?.result?.payout ?? null}
+                resolutionStatus={MOCK_INSTANCES[battle.id]?.resolutionStatus ?? null}
               />
             )}
 
@@ -203,6 +207,7 @@ export function BattlePage() {
               sideBPct={sideB.pct}
               color={color}
               userBet={predictResult && predictResult.ok ? predictResult : null}
+              resolutionStatus={MOCK_INSTANCES[battle.id]?.resolutionStatus ?? null}
             />
 
             {/* Live market data — % since open + price graph (Up/Down + Outperform only) */}
@@ -227,7 +232,20 @@ export function BattlePage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 8 }}>
                 <StatBox label="Volume" value={`${battle.volumeK}K`} sub="Fini Coin" />
-                <StatBox label="Time Left" value={fmtTime(remainingMs)} sub="until resolution" />
+                <StatBox
+                  label="Time Left"
+                  value={
+                    remainingMs > 0 ? fmtTime(remainingMs)
+                      : MOCK_INSTANCES[battle.id]?.resolutionStatus === "manual_review" ? "Hold"
+                      : MOCK_INSTANCES[battle.id]?.resolutionStatus === "voided" ? "Voided"
+                      : "Settled"
+                  }
+                  sub={
+                    remainingMs > 0 ? "until resolution"
+                      : MOCK_INSTANCES[battle.id]?.resolutionStatus === "manual_review" ? "awaiting oracle"
+                      : "this round"
+                  }
+                />
                 <StatBox label="Arena Mood" value={battle.volumeK > 100 ? "Volatile" : "Calm"} sub="intensity" />
               </div>
             </div>
@@ -461,7 +479,7 @@ function BalanceDisplay() {
  * the reference there. (Two cute Finis sketched facing each other.)
  */
 function BattleArenaHero({
-  battle, endsAt, remainingMs, sideALabel, sideBLabel, sideAPct, sideBPct, color, userBet,
+  battle, endsAt, remainingMs, sideALabel, sideBLabel, sideAPct, sideBPct, color, userBet, resolutionStatus,
 }: {
   battle: { id: string; endsInMs: number; assets: string[]; familyA?: string; familyB?: string; durationLabel?: string };
   endsAt: number;        // shared anchored end time (single source of truth)
@@ -470,6 +488,9 @@ function BattleArenaHero({
   sideAPct: number; sideBPct: number;
   color: string;
   userBet: { side: "A" | "B"; stake: number } | null;
+  /** Server resolution status, so the footer can show the right state when
+   *  the timer is at 0 (Settled vs Awaiting Oracle vs Voided). */
+  resolutionStatus?: "open" | "pending" | "locked" | "resolving" | "manual_review" | "voided" | "resolved" | null;
 }) {
   function parseDurationLabel(label?: string): number {
     if (!label) return battle.endsInMs;
@@ -575,7 +596,12 @@ function BattleArenaHero({
                 : settled?.status === "lost" ? `💀 Lost ${settled.stake} FINI$`
                 : settled?.status === "voided" ? `↩️ Voided — ${settled.stake} FINI$ refunded`
                 : settled?.status === "sold" ? `💸 Sold early for ${settled.soldFor?.toLocaleString() ?? 0} FINI$`
-                : remaining > 0 ? "● Battle in progress" : "⚖️ Awaiting price oracle"}
+                : remaining > 0 ? "● Battle in progress"
+                : resolutionStatus === "manual_review" ? "⚖️ Awaiting price oracle"
+                : resolutionStatus === "resolving" ? "⌛ Capturing end price…"
+                : resolutionStatus === "pending" ? "⌛ Settling…"
+                : resolutionStatus === "voided" ? "↩️ Voided"
+                : "🏁 Settled — see banner above"}
             </div>
           </div>
         </div>

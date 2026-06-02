@@ -57,11 +57,24 @@ export function WinnerBanner({
   battle,
   userBetSide,
   userPayout,
+  /**
+   * If the server's resolution audit is anything OTHER than a clean settle
+   * (e.g. manual_review, pending, voided), we don't pretend we know the
+   * winner — the ResolutionAuditPanel below is the authoritative voice.
+   */
+  resolutionStatus,
 }: {
   battle: BattleLite;
   userBetSide?: "A" | "B" | null;
   userPayout?: number | null;
+  resolutionStatus?: "open" | "pending" | "locked" | "resolving" | "manual_review" | "voided" | "resolved" | null;
 }) {
+  // When the server says manual_review / pending / voided, suppress the
+  // banner entirely — the audit panel covers that state authoritatively
+  // and a confident "X wins" headline would be misleading.
+  if (resolutionStatus === "manual_review" || resolutionStatus === "pending" || resolutionStatus === "voided") {
+    return null;
+  }
   const [nextId, setNextId] = useState<string | null>(null);
   const [loadingNext, setLoadingNext] = useState(true);
 
@@ -75,6 +88,11 @@ export function WinnerBanner({
   const { winner, reasoning } = determineWinner(battle);
   const winnerLabel = winner === "A" ? battle.sideA.label : battle.sideB.label;
   const winnerColor = winner === "A" ? "#16a34a" : "#dc2626";
+  // "No wins" reads as "no winner". "Yes wins" reads as a stutter. For short
+  // affirmative labels we use "carries this round" instead — reads cleanly
+  // regardless of the label ("No carries this round", "BTC carries this round",
+  // "Up carries this round").
+  const winnerHeadline = `${winnerLabel} carries this round`;
   const playerWon = userBetSide != null && userBetSide === winner;
   const playerLost = userBetSide != null && userBetSide !== winner;
 
@@ -98,7 +116,7 @@ export function WinnerBanner({
             🏁 Battle Settled
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: winnerColor }}>
-            {winnerLabel} wins
+            {winnerHeadline}
           </div>
         </div>
         {userBetSide != null && (
