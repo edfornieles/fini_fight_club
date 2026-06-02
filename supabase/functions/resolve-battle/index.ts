@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
 
   const sb = supabaseAdmin();
   const { data: battle, error } = await sb.from("battle_instances")
-    .select("*, battle_templates(battle_type, max_deviation_bps, threshold)")
+    .select("*, battle_templates(battle_type, max_deviation_bps)")
     .eq("id", battleId).maybeSingle();
   if (error || !battle) return jsonResponse({ error: "battle_not_found" }, 404);
   if (battle.resolution_status === "resolved") return jsonResponse({ already_resolved: true });

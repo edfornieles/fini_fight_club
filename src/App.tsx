@@ -41,6 +41,7 @@ import { PlayerProfilePage } from "./pages/PlayerProfilePage";
 import { ChallengePage } from "./pages/ChallengePage";
 import { TournamentPage } from "./pages/TournamentPage";
 import { StrategiesPage } from "./pages/StrategiesPage";
+import { AdminBotsPage } from "./pages/AdminBotsPage";
 
 export default function App() {
   // Battle settlement runs globally so resolutions happen no matter where
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="/challenge" element={<ChallengePage />} />
           <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/tournament" element={<TournamentPage />} />
+          <Route path="/admin/bots" element={<AdminBotsPage />} />
         </Routes>
       </ErrorBoundary>
       {/* Game overlays (modal layers, phase-driven) */}

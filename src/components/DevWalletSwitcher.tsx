@@ -148,8 +148,11 @@ export function DevWalletSwitcher() {
           {/* House bots — play as any of them to inspect their account */}
           {bots.length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 10, color: "#777", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                🤖 House bots ({bots.length})
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ fontSize: 10, color: "#777", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  🤖 House bots ({bots.length})
+                </span>
+                <a href="/admin/bots" style={{ fontSize: 10, color: "#3b82f6", fontWeight: 700, textDecoration: "none" }}>Performance →</a>
               </div>
               <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
                 {bots.map(b => (
