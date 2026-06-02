@@ -84,8 +84,11 @@ async function runHouseBots(env) {
 
   let placed = 0;
   for (const bot of bots) {
-    // Each bot acts on at most 2 battles per tick (keeps volume sane)
-    let actsLeft = 2;
+    // Each bot acts on up to 6 battles per tick. Was 2 — too low: with only
+    // 8 open battles available the bots filled their candidates in 2 ticks
+    // then sat idle for hours waiting for resolutions. 6 gets them through
+    // the full candidate list per tick when capacity exists.
+    let actsLeft = 6;
     for (const battle of battles) {
       if (actsLeft <= 0) break;
       if (taken.has(`${bot.wallet_address}:${battle.id}`)) continue;
@@ -124,9 +127,10 @@ function decideSide(bot, battle) {
     case "flat_bias":
       return params.sideFilter || "A";
     case "contrarian":
-      // No live odds server-side here → lean to the structurally-favoured side
-      // sparingly; act ~50% of ticks to avoid every bot piling on.
-      return Math.random() < 0.5 ? "B" : null;
+      // Always fade the structurally-favoured side. The previous 50% random
+      // skip meant these bots were idle half the time for no good reason —
+      // contrarians should always bet the underdog when one exists.
+      return "B";
     case "momentum":
     case "momentum_underlying":
     case "late_sniper": {
