@@ -101,7 +101,7 @@ export function useBattleResolver() {
     // up-to-date battle state to read winning odds from. start() is idempotent.
     useCryptoSim.getState().start();
 
-    const tick = setInterval(() => {
+    function check() {
       const now = Date.now();
       const entries = useMyEntries.getState().entries;
       const openExpired = entries.filter(e => e.status === "open" && e.endsAt <= now);
@@ -185,8 +185,12 @@ export function useBattleResolver() {
       // Garbage-collect settled entries older than 5 minutes so the My Active
       // Battles list eventually trims itself.
       useMyEntries.getState().pruneSettled(5 * 60 * 1000);
-    }, 2000);
-
+    }
+    // Run immediately on mount so a battle whose timer hit 0 while the page
+    // was loading resolves NOW, not after a delay. Then tick fast (500ms)
+    // so the player never sits watching "Awaiting price oracle".
+    check();
+    const tick = setInterval(check, 500);
     return () => clearInterval(tick);
   }, []);
 }

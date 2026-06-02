@@ -5,8 +5,8 @@
  * a clear final-price audit, then drives the player to the next instance of
  * the same template via findNextBattle. There's always a next round.
  */
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { findNextBattle } from "../lib/nextBattle";
 import { intraWindowReturn, openingFor } from "../lib/openingPrices";
 import { getCachedPrices } from "../lib/priceProviders";
@@ -77,6 +77,10 @@ export function WinnerBanner({
   }
   const [nextId, setNextId] = useState<string | null>(null);
   const [loadingNext, setLoadingNext] = useState(true);
+  const [autoSeconds, setAutoSeconds] = useState(8); // auto-jump countdown
+  const [paused, setPaused] = useState(false);
+  const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +88,17 @@ export function WinnerBanner({
     findNextBattle(battle.id).then(id => { if (alive) { setNextId(id); setLoadingNext(false); } });
     return () => { alive = false; };
   }, [battle.id]);
+
+  // Auto-advance to the next round once we know its id. Counts down 8s, pauses
+  // while the cursor is over the banner so the player can read the result.
+  // They can also click "Next round →" any time to jump immediately, or click
+  // "Stay" to cancel the auto-jump entirely.
+  useEffect(() => {
+    if (!nextId || paused) return;
+    if (autoSeconds <= 0) { navigate(`/battle/${nextId}`); return; }
+    const t = setTimeout(() => setAutoSeconds(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [nextId, paused, autoSeconds, navigate]);
 
   const { winner, reasoning } = determineWinner(battle);
   const winnerLabel = winner === "A" ? battle.sideA.label : battle.sideB.label;
@@ -97,7 +112,11 @@ export function WinnerBanner({
   const playerLost = userBetSide != null && userBetSide !== winner;
 
   return (
-    <div style={{
+    <div
+      ref={containerRef}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      style={{
       background: playerWon ? "linear-gradient(135deg, #f0fdf4, #dcfce7)"
         : playerLost ? "linear-gradient(135deg, #fef2f2, #fee2e2)"
         : "linear-gradient(135deg, #fafafa, #f3f4f6)",
@@ -141,7 +160,7 @@ export function WinnerBanner({
         {reasoning}
       </div>
 
-      {/* Next round CTA — Polymarket-style continuity */}
+      {/* Next round CTA + auto-advance countdown */}
       <div style={{ borderTop: "1px solid #d4d4d8", paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.8 }}>
@@ -149,30 +168,44 @@ export function WinnerBanner({
           </div>
           <div style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>
             {loadingNext ? "Finding the next round…"
-              : nextId ? `The next round is open — bet again before the window closes.`
+              : nextId ? (paused ? "Hover paused — release to continue auto-advance." : `Auto-jumping in ${autoSeconds}s…`)
               : "Watching for the next round to spawn…"}
           </div>
         </div>
         {nextId && (
-          <Link
-            to={`/battle/${nextId}`}
-            style={{
-              background: "linear-gradient(135deg, #f472b6, #ec4899)",
-              color: "#fff",
-              padding: "12px 24px",
-              borderRadius: 100,
-              fontWeight: 800,
-              fontSize: 14,
-              textDecoration: "none",
-              boxShadow: "0 4px 14px rgba(244,114,182,0.30)",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Next round →
-          </Link>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={() => setPaused(true)}
+              style={{
+                background: "transparent", color: "#666",
+                border: "1.5px solid #d4d4d8", borderRadius: 100,
+                padding: "10px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >Stay here</button>
+            <Link
+              to={`/battle/${nextId}`}
+              style={{
+                background: "linear-gradient(135deg, #f472b6, #ec4899)",
+                color: "#fff",
+                padding: "12px 24px",
+                borderRadius: 100,
+                fontWeight: 800,
+                fontSize: 14,
+                textDecoration: "none",
+                boxShadow: "0 4px 14px rgba(244,114,182,0.30)",
+                display: "inline-flex", alignItems: "center", gap: 8,
+                whiteSpace: "nowrap",
+                position: "relative", overflow: "hidden",
+              }}
+            >
+              Next round
+              <span style={{
+                background: "rgba(255,255,255,0.25)",
+                borderRadius: 100, padding: "2px 8px", fontSize: 11, fontWeight: 900,
+                fontFamily: "monospace",
+              }}>{autoSeconds}s</span>
+            </Link>
+          </div>
         )}
         {!nextId && !loadingNext && (
           <Link
