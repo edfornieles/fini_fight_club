@@ -92,15 +92,10 @@ export function DevWalletSwitcher() {
     const a = addr.trim().toLowerCase();
     if (!/^0x[0-9a-f]{40}$/i.test(a)) { alert("Not a valid 0x address"); return; }
     useUIStore.setState({ walletAddress: a });
-    // Seed the SAP-style starting bank (1,000 FINI$). Same for everyone — your
-    // task is to run it up without busting.
-    if (useCoinStore.getState().balance < 100) {
-      useCoinStore.getState().setBalance(1_000);
-    }
-    // Also seed starting Crumbs (30 🍪) for the in-battle economy.
-    import("../state/crumbStore").then(({ useCrumbStore }) => {
-      if (useCrumbStore.getState().crumbs > 30) useCrumbStore.getState().resetRun();
-    });
+    // Switch to THIS account's own balance. Fresh dev accounts seed at 1,000;
+    // bots/funded wallets pull their real Supabase balance. Each account keeps
+    // its own balance that changes as it plays.
+    useCoinStore.getState().useWallet(a, 1_000);
     setOpen(false);
   }
   function disconnect() {

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAccount } from "wagmi";
 import { useUIStore } from "../state/uiStore";
+import { useCoinStore } from "../state/coinStore";
 import { useSiweAuth } from "../hooks/useSiweAuth";
 
 /**
@@ -23,7 +24,10 @@ export function WalletSync() {
     // disable it is the user setting fini_dev=0 (via /?dev=0).
     const devMode = typeof window !== "undefined" && localStorage.getItem("fini_dev") !== "0";
     if (isConnected && address && address.toLowerCase() !== walletAddress) {
-      connectWallet(address.toLowerCase());
+      const a = address.toLowerCase();
+      connectWallet(a);
+      // Load this connected wallet's own balance.
+      useCoinStore.getState().useWallet(a, 1_000);
     } else if (!isConnected && walletAddress && !devMode) {
       disconnectWallet();
     }

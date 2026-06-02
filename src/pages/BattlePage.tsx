@@ -86,44 +86,22 @@ export function BattlePage() {
         durationMs: parseDur(battle.durationLabel),
       });
     };
-    try {
-      const r = await api.predictPlace({
-        battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey,
-      });
-      setPredictResult({ ok: true, side: r.side, stake: r.stake });
-      persistEntry(r.side, r.stake);
+    // ── Play-money beta: predictions settle LOCALLY ──────────────────────────
+    // The backend (predict-place) requires a real SIWE session; dev-impersonated
+    // players don't have one, so calling it always 401s. During beta we settle
+    // locally — the FINI$ debit above + this entry + the resolver are the
+    // authoritative path. (The server call returns when real wallet auth ships.)
+    persistEntry(selectedSide, amount);
+    setPredictResult({ ok: true, side: selectedSide, stake: amount });
+    setPredicting(false);
+    // Fire-and-forget server record if a real session ever exists. A 401/offline
+    // is expected in beta and silently ignored — local settlement already done.
+    void api.predictPlace({
+      battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey,
+    }).then(() => {
       const wallet = useUIStore.getState().walletAddress;
       if (wallet) useCoinStore.getState().refresh(wallet);
-    } catch (e) {
-      // Backend not deployed — that's fine in dev mode. The local FINI$ debit
-      // above already happened; treat this as a successful local prediction.
-      const msg = (e instanceof Error ? e.message : "predict_failed").toLowerCase();
-      // In play-money beta, predictions are local-first. The backend exists but
-      // requires a real SIWE session; dev-impersonated players have none, so an
-      // auth error (401/403/unauthorized/jwt) is expected — treat it like
-      // offline and settle locally rather than surfacing a scary "HTTP 401".
-      const isAuthOrNetwork =
-        msg.includes("offline") || msg.includes("failed to fetch") ||
-        msg.includes("backend") || msg.includes("network") ||
-        msg.includes("401") || msg.includes("403") ||
-        msg.includes("unauthorized") || msg.includes("jwt") || msg.includes("no auth");
-      if (isAuthOrNetwork) {
-        setPredictResult({ ok: true, side: selectedSide, stake: amount });
-        persistEntry(selectedSide, amount);
-      } else {
-        // Real error (insufficient funds server-side, battle closed, etc.) —
-        // refund the optimistic debit and show the message.
-        useCoinStore.getState().earn(amount);
-        const friendly =
-          msg.includes("insufficient_funds")  ? "Not enough FINI$ — claim more or earn from battles."
-        : msg.includes("battle_closed")        ? "This battle is no longer accepting entries."
-        : msg.includes("past_entry_cutoff")    ? "Entry window closed."
-        : msg;
-        setPredictResult({ ok: false, error: friendly });
-      }
-    } finally {
-      setPredicting(false);
-    }
+    }).catch(() => { /* expected in beta */ });
   }
 
   if (!battle) {
