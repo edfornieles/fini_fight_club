@@ -344,60 +344,81 @@ export function BattlePage() {
                 <SideBtn label={sideB.label} pct={sideB.pct} side="B" selected={selectedSide === "B"} color="#dc2626" bg="#fee2e2" onSelect={() => setSelectedSide("B")} />
               </div>
 
-              {/* Amount — chips show the projected win for the selected side
-                  so the player sees the payout without doing the math. */}
+              {/* Amount block — big-number display + additive chips. Chips
+                  ADD to the current stake rather than replacing it, so the
+                  player can build up a position quickly ("+50 +50 +100" =
+                  200) without retyping. Reset is one tap. */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa" }}>FINI$ amount</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb" }}>
-                    {selectedSide ? `win at ${selectedSide === "A" ? sideA.pct : sideB.pct}%` : "pick a side to preview win"}
-                  </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa" }}>Amount</div>
+                  <button
+                    onClick={() => setStake("0")}
+                    style={{
+                      background: "transparent", border: "none", cursor: "pointer",
+                      fontSize: 10, fontWeight: 700, color: "#bbb",
+                      textTransform: "uppercase", letterSpacing: 0.5,
+                    }}
+                  >Reset</button>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {["50", "100", "250", "500"].map(v => {
-                    const n = Number(v);
-                    const win = selectedSide ? Math.round(n * 100 / (selectedSide === "A" ? sideA.pct : sideB.pct)) : null;
-                    const active = stake === v;
-                    return (
-                      <button key={v} onClick={() => setStake(v)} style={{
-                        flex: 1, padding: "8px 4px", borderRadius: 10, border: "none", cursor: "pointer",
-                        fontSize: 12, fontWeight: 700,
-                        background: active ? "#111" : "#f3f4f6",
-                        color: active ? "#fff" : "#666",
-                        display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                      }}>
-                        <span>{v}</span>
-                        {win != null && (
-                          <span style={{ fontSize: 9, fontWeight: 800, color: active ? "#86efac" : "#16a34a" }}>
-                            win {win.toLocaleString()}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Big number — editable directly */}
                 <input
-                  type="number" value={stake} onChange={e => setStake(e.target.value)}
+                  type="number"
+                  value={stake}
+                  onChange={e => setStake(e.target.value)}
                   style={{
-                    width: "100%", marginTop: 8, padding: "10px 14px", borderRadius: 12,
-                    border: "1.5px solid #e5e7eb", fontSize: 14, fontWeight: 600, color: "#111",
-                    boxSizing: "border-box",
+                    width: "100%",
+                    padding: "8px 0",
+                    border: "none",
+                    fontSize: 38, fontWeight: 900, color: "#111",
+                    fontVariantNumeric: "tabular-nums",
+                    background: "transparent",
+                    outline: "none",
+                    fontFamily: "'Nunito', system-ui, sans-serif",
                   }}
                 />
+                {/* Additive chips */}
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  {[10, 50, 100, 250].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setStake(String((Math.round(Number(stake)) || 0) + v))}
+                      style={{
+                        flex: 1, padding: "8px 0", borderRadius: 10,
+                        border: "1.5px solid #e5e7eb", background: "#fff",
+                        fontSize: 12, fontWeight: 800, color: "#111",
+                        cursor: "pointer",
+                      }}
+                    >+{v}</button>
+                  ))}
+                </div>
               </div>
 
-              {/* Fee breakdown */}
-              <div style={{ background: "#f9fafb", borderRadius: 12, padding: "12px 14px", fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
-                  <span>Stake</span><span style={{ fontWeight: 700 }}>{stake} FINI$</span>
+              {/* To-win prominence — the reward is the focus, not the fee */}
+              <div style={{
+                background: selectedSide ? "#f0fdf4" : "#fafafa",
+                border: `1.5px solid ${selectedSide ? "#bbf7d0" : "#f0f0f0"}`,
+                borderRadius: 14, padding: "14px 16px",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#666", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    To win
+                  </div>
+                  <div style={{ fontSize: 10, color: "#999", marginTop: 2, fontWeight: 700 }}>
+                    {selectedSide
+                      ? `at ${selectedSide === "A" ? sideA.pct : sideB.pct}¢ / share · fee ~${fee} FINI$`
+                      : "Pick a side to see your payout"}
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
-                  <span>Arena fee (7%)</span><span style={{ fontWeight: 700 }}>~{fee} FINI$</span>
-                </div>
-                <div style={{ height: 1, background: "#e5e7eb", margin: "4px 0" }} />
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, color: "#111" }}>
-                  <span>Max winnings</span>
-                  <span>{selectedSide ? Math.round(Number(stake) * (selectedSide === "A" ? 100 / sideA.pct : 100 / sideB.pct)) : "—"} FINI$</span>
+                <div style={{
+                  fontSize: 28, fontWeight: 900,
+                  color: selectedSide ? "#16a34a" : "#bbb",
+                  fontVariantNumeric: "tabular-nums",
+                }}>
+                  {selectedSide
+                    ? Math.round(Number(stake) * (selectedSide === "A" ? 100 / sideA.pct : 100 / sideB.pct)).toLocaleString()
+                    : "—"}
+                  <span style={{ fontSize: 13, opacity: 0.7, marginLeft: 4 }}>FINI$</span>
                 </div>
               </div>
 
@@ -551,14 +572,21 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub: str
 function SideBtn({ label, pct, selected, color, bg, onSelect }: {
   label: string; pct: number; side: string; selected: boolean; color: string; bg: string; onSelect: () => void;
 }) {
+  // pct is the implied probability — equivalent to a share price in cents
+  // out of 100. A 54% side costs ~54¢ per FINI$ of potential payout.
   return (
     <button onClick={onSelect} style={{
-      padding: "12px 8px", borderRadius: 12, border: selected ? `2px solid ${color}` : "2px solid transparent",
-      background: selected ? bg : "#f9fafb", cursor: "pointer", transition: "all 0.12s",
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+      padding: "16px 10px", borderRadius: 14,
+      border: selected ? `2.5px solid ${color}` : "2px solid #e5e7eb",
+      background: selected ? bg : "#fff", cursor: "pointer", transition: "all 0.12s",
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
     }}>
-      <span style={{ fontSize: 18, fontWeight: 900, color: selected ? color : "#555" }}>{pct}%</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: selected ? color : "#888" }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 900, color: selected ? color : "#111" }}>
+        {label} <span style={{ fontVariantNumeric: "tabular-nums", opacity: 0.85 }}>{pct}¢</span>
+      </span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: selected ? color : "#888", textTransform: "uppercase", letterSpacing: 0.4 }}>
+        {selected ? "your pick" : "tap to pick"}
+      </span>
     </button>
   );
 }
