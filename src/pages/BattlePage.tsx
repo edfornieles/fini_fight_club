@@ -8,6 +8,7 @@ import { useCoinStore, fmtCoin } from "../state/coinStore";
 import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
+import { WinnerBanner } from "../components/WinnerBanner";
 import { useLivePrices } from "../hooks/useLivePrices";
 import { useCryptoSim, useSimBattles, useSimFeed, battleEndsAtMs } from "../data/cryptoSim";
 import { personaFor } from "../lib/ghostPersonas";
@@ -178,6 +179,16 @@ export function BattlePage() {
                 </span>
               </div>
             </div>
+
+            {/* Winner declaration + next-round CTA — Polymarket-style continuity.
+                Renders only when the battle has settled (timer hit zero). */}
+            {remainingMs <= 0 && (
+              <WinnerBanner
+                battle={battle}
+                userBetSide={predictResult && predictResult.ok ? predictResult.side : null}
+                userPayout={useMyEntries.getState().entries.find(e => e.battleId === battle.id)?.result?.payout ?? null}
+              />
+            )}
 
             {/* Hero battle arena — shows two Finis facing off, expands after a
                 prediction is placed. Progress bar tracks time to resolution.

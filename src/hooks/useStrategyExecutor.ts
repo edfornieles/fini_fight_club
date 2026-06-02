@@ -60,9 +60,13 @@ function decideForecastSide(strategy: Strategy, battle: BattleLike, remainingMs:
       return battle.sideA.pct > battle.sideB.pct ? "A" : "B";
     }
     case "late_joiner": {
-      const fireUnder = strategy.params.fireUnderRemainingPct ?? 10;
+      // Was 10% — too narrow, the page had to be open during the final minutes.
+      // 35% gives this strategy real opportunity to fire while still being "late".
+      const fireUnder = strategy.params.fireUnderRemainingPct ?? 35;
       if (remainingPct > fireUnder) return null;
-      if (Math.abs(battle.sideA.pct - battle.sideB.pct) < 3) return null;
+      // Required odds gap loosened 3 → 2 so it fires on most battles with any
+      // discernible favourite, not just lopsided ones.
+      if (Math.abs(battle.sideA.pct - battle.sideB.pct) < 2) return null;
       return battle.sideA.pct > battle.sideB.pct ? "A" : "B";
     }
 
@@ -88,14 +92,15 @@ function decideForecastSide(strategy: Strategy, battle: BattleLike, remainingMs:
       return null;
     }
     case "late_sniper": {
-      // Only fires in final 60 seconds. Uses the actual intra-window return
-      // to pick the side reality is confirming. Riskless if the price feed
-      // and resolution agree.
-      if (remainingMs > 60_000) return null;
+      // Was 60s — virtually never fired in practice (player would have to be
+      // on the page during the final minute of a battle). 5 minutes still
+      // captures the "late, confirmed move" intent but actually fires.
+      if (remainingMs > 5 * 60_000) return null;
       const ret = intraWindowReturn(battle.id, sym);
       if (ret == null) return null;
-      // Need a meaningful move to commit — avoid coin flips
-      if (Math.abs(ret) < 0.001) return null;
+      // Need a meaningful move to commit — avoid coin flips. 0.05% is small
+      // enough to fire in normal markets, big enough to skip pure noise.
+      if (Math.abs(ret) < 0.0005) return null;
       return ret > 0 ? "A" : "B";
     }
     default:
@@ -105,7 +110,7 @@ function decideForecastSide(strategy: Strategy, battle: BattleLike, remainingMs:
 
 export function useStrategyExecutor() {
   useEffect(() => {
-    const tick = setInterval(() => {
+    function runOnce() {
       const strategies = useStrategies.getState().strategies;
       const enabled = strategies.filter(s => s.enabled);
       if (enabled.length === 0) return;
@@ -180,8 +185,11 @@ export function useStrategyExecutor() {
           break;
         }
       }
-    }, 5_000);
-
+    }
+    // Fire once immediately so a freshly-deployed strategy doesn't wait 5s
+    // for its first chance. Then tick every 3s (was 5s — slow for the user).
+    runOnce();
+    const tick = setInterval(runOnce, 3_000);
     return () => clearInterval(tick);
   }, []);
 }
