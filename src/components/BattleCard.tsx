@@ -72,11 +72,19 @@ function useSecondTick() {
 }
 
 function StatusChip({ status, endsInMs }: { status: string; endsInMs: number }) {
-  const endingSoon = endsInMs > 0 && endsInMs < 1000 * 60 * 20;
+  const endingSoon = endsInMs > 0 && endsInMs < 1000 * 60 * 20;   // < 20 min → red "Ending soon"
+  const aboutToEnd = endsInMs > 0 && endsInMs < 1000 * 30;        // < 30 s → blink
   if (status === "live") return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 100, background: endingSoon ? "#fff3cd" : "#dcfce7", color: endingSoon ? "#92400e" : "#15803d" }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: endingSoon ? "#f59e0b" : "#22c55e" }} />
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 800,
+      padding: "3px 9px", borderRadius: 100,
+      background: endingSoon ? "#fee2e2" : "#dcfce7",
+      color: endingSoon ? "#dc2626" : "#15803d",
+      animation: aboutToEnd ? "fini-blink 0.9s steps(2, start) infinite" : undefined,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: endingSoon ? "#ef4444" : "#22c55e" }} />
       {endingSoon ? "Ending soon" : "Live"}
+      <style>{`@keyframes fini-blink { 50% { opacity: 0.35; } }`}</style>
     </span>
   );
   if (status === "upcoming")  return <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 100, background: "#dbeafe", color: "#1d4ed8" }}>Upcoming</span>;
