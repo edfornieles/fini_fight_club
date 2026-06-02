@@ -215,8 +215,12 @@ export function LiveMarketCard({
           Live Price · since battle open
         </div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#16a34a" }}>
-          <span style={{ width: 7, height: 7, borderRadius: 99, background: "#22c55e", display: "inline-block" }} />
+          <span style={{
+            width: 7, height: 7, borderRadius: 99, background: "#22c55e", display: "inline-block",
+            animation: "fini-pulse 1.4s ease-in-out infinite",
+          }} />
           LIVE
+          <style>{`@keyframes fini-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }`}</style>
         </div>
       </div>
 

@@ -146,6 +146,33 @@ export function BattlePage() {
     return `${h}h ${String(m % 60).padStart(2, "0")}m`;
   }
 
+  // Duration parser (shared by the title-window display + entry cutoff calc).
+  function parseDur(label?: string): number {
+    if (!label) return 60 * 60 * 1000;
+    const m = /^(\d+)(m|h)$/.exec(label.trim());
+    if (!m) return 60 * 60 * 1000;
+    return Number(m[1]) * (m[2] === "h" ? 3_600_000 : 60_000);
+  }
+
+  // Format the battle's real window in the player's local timezone.
+  // E.g. "Jun 2, 8:30 → 10:30 PM BST" or "Jun 2, 8:30–8:45 PM BST" for short windows.
+  function fmtWindow(startMs: number, endMs: number): string {
+    const start = new Date(startMs), end = new Date(endMs);
+    const sameDay = start.toDateString() === end.toDateString();
+    const datePart = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const tPart = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    const tz = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(end).find(p => p.type === "timeZoneName")?.value ?? "";
+    return sameDay
+      ? `${datePart}, ${tPart(start)} → ${tPart(end)} ${tz}`
+      : `${datePart} ${tPart(start)} → ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${tPart(end)} ${tz}`;
+  }
+
+  // Entry cutoff: the last 30 seconds of the window are locked for new bets.
+  // Mirrors the server's entry_cutoff_seconds setting and protects against
+  // late-window front-running once the outcome is essentially knowable.
+  const ENTRY_CUTOFF_MS = 30_000;
+  const entryClosed = remainingMs > 0 && remainingMs <= ENTRY_CUTOFF_MS;
+
   return (
     <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
       {/* Breadcrumb */}
@@ -170,12 +197,30 @@ export function BattlePage() {
                 {battle.assets.map(a => (
                   <span key={a} style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: ASSET_COLORS[a] + "20", color: ASSET_COLORS[a] }}>{a}</span>
                 ))}
-                <StatusPill status={battle.status} />
-                <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "#888" }}>
+                <StatusPill status={battle.status} live={remainingMs > 0} />
+                {/* Live countdown chip — the green dot and the clock both pulse
+                    so peripheral vision can tell the page is fresh. Stops once
+                    the battle has ended. */}
+                <span style={{
+                  marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6,
+                  fontSize: 13, fontWeight: 700, color: remainingMs > 0 ? "#16a34a" : "#888",
+                  fontVariantNumeric: "tabular-nums",
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: 99,
+                    background: remainingMs > 0 ? "#22c55e" : "#9ca3af",
+                    animation: remainingMs > 0 ? "fini-pulse 1.4s ease-in-out infinite" : undefined,
+                  }} />
                   ⏱ {fmtTime(remainingMs)}
+                  <style>{`@keyframes fini-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }`}</style>
                 </span>
               </div>
-              <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111", margin: "0 0 8px" }}>{battle.title}</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111", margin: "0 0 4px" }}>{battle.title}</h1>
+              {/* Real round window in the player's local time. Verifiable
+                  reference — they can check the price feed at this exact slot. */}
+              <div style={{ fontSize: 12, color: "#888", fontWeight: 600, marginBottom: 10 }}>
+                {fmtWindow(endsAt - parseDur(battle.durationLabel), endsAt)}
+              </div>
               <p style={{ fontSize: 16, color: "#555", fontWeight: 600, margin: "0 0 12px", lineHeight: 1.5 }}>{battle.question}</p>
               {/* Stated resolution rule — the contract, up front */}
               <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#f8fafc", border: "1px solid #e8edf2", borderRadius: 10, padding: "10px 12px" }}>
@@ -377,19 +422,35 @@ export function BattlePage() {
                 }
                 return (
                   <>
+                    {/* Entry cutoff banner — explains the locked state */}
+                    {entryClosed && (
+                      <div style={{
+                        marginBottom: 10, padding: "10px 14px", borderRadius: 10,
+                        background: "#fef3c7", border: "1.5px solid #fbbf24",
+                        fontSize: 12, color: "#854d0e", fontWeight: 700,
+                        textAlign: "center",
+                      }}>
+                        🔒 Entries closed — final 30 seconds. Watch the resolution come in.
+                      </div>
+                    )}
                     <button
                       onClick={placePrediction}
-                      disabled={!selectedSide || predicting}
+                      disabled={!selectedSide || predicting || entryClosed}
                       style={{
                         width: "100%", padding: "14px 0", borderRadius: 100, border: "none",
                         fontSize: 15, fontWeight: 800,
-                        cursor: (!selectedSide || predicting) ? "not-allowed" : "pointer",
-                        background: (!selectedSide || predicting) ? "#e5e7eb" : "#f472b6",
-                        color: (!selectedSide || predicting) ? "#aaa" : "#fff",
+                        cursor: (!selectedSide || predicting || entryClosed) ? "not-allowed" : "pointer",
+                        background: entryClosed ? "#fcd34d"
+                          : (!selectedSide || predicting) ? "#e5e7eb"
+                          : "#f472b6",
+                        color: entryClosed ? "#854d0e"
+                          : (!selectedSide || predicting) ? "#aaa"
+                          : "#fff",
                         transition: "all 0.15s",
                       }}
                     >
-                      {predicting ? "Placing prediction…"
+                      {entryClosed ? "🔒 Entries closed"
+                        : predicting ? "Placing prediction…"
                         : selectedSide ? `Predict ${selectedSide === "A" ? sideA.label : sideB.label} →`
                         : "Select a side"}
                     </button>
@@ -424,7 +485,24 @@ export function BattlePage() {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status, live }: { status: string; live?: boolean }) {
+  // When `live` is true and the status is "live", render with an animated
+  // green dot so peripheral vision can tell the page is fresh.
+  if (status === "live" && live) {
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100,
+        background: "#dcfce7", color: "#15803d",
+      }}>
+        <span style={{
+          width: 7, height: 7, borderRadius: 99, background: "#22c55e",
+          animation: "fini-pulse 1.4s ease-in-out infinite",
+        }} />
+        Live
+      </span>
+    );
+  }
   const styles: Record<string, { bg: string; color: string; label: string }> = {
     live: { bg: "#dcfce7", color: "#15803d", label: "🟢 Live" },
     upcoming: { bg: "#dbeafe", color: "#1d4ed8", label: "🔵 Upcoming" },
