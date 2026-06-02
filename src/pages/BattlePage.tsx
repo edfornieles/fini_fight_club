@@ -9,7 +9,7 @@ import { useMyEntries } from "../state/myEntriesStore";
 import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
 import { useLivePrices } from "../hooks/useLivePrices";
-import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
+import { useCryptoSim, useSimBattles, useSimFeed, battleEndsAtMs } from "../data/cryptoSim";
 import { personaFor } from "../lib/ghostPersonas";
 import { openingFor, intraWindowReturn } from "../lib/openingPrices";
 import { getCachedPrices } from "../lib/priceProviders";
@@ -130,15 +130,26 @@ export function BattlePage() {
   const primaryAsset = battle.assets[0];
   const color = ASSET_COLORS[primaryAsset] ?? "#f472b6";
   const meta = ASSET_META[primaryAsset];
-  const endsInMin = Math.floor(battle.endsInMs / 60000);
   const fee = Math.round(Number(stake) * 0.07 * (sideA.pct / 100) * (sideB.pct / 100));
 
+  // ── Single source of truth for time on this page ──────────────────────────
+  // Every clock (title chip, Battle Momentum, the hero) derives from this one
+  // anchored end time + a 1s tick, so they all agree and tick live.
+  const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const remainingMs = Math.max(0, endsAt - nowMs);
+
   function fmtTime(ms: number) {
-    if (ms <= 0) return "Ended";
-    const m = Math.floor(ms / 60000);
-    if (m < 60) return `${m}m`;
+    if (ms <= 0) return "Resolving…";
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
     const h = Math.floor(m / 60);
-    return `${h}h ${m % 60}m`;
+    if (h < 1) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
+    return `${h}h ${String(m % 60).padStart(2, "0")}m`;
   }
 
   return (
@@ -167,7 +178,7 @@ export function BattlePage() {
                 ))}
                 <StatusPill status={battle.status} />
                 <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "#888" }}>
-                  ⏱ {fmtTime(battle.endsInMs)}
+                  ⏱ {fmtTime(remainingMs)}
                 </span>
               </div>
               <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111", margin: "0 0 8px" }}>{battle.title}</h1>
@@ -186,6 +197,8 @@ export function BattlePage() {
                 Sits above Battle Momentum so the graphic leads the page. */}
             <BattleArenaHero
               battle={battle}
+              endsAt={endsAt}
+              remainingMs={remainingMs}
               sideALabel={sideA.label}
               sideBLabel={sideB.label}
               sideAPct={sideA.pct}
@@ -216,7 +229,7 @@ export function BattlePage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 8 }}>
                 <StatBox label="Volume" value={`${battle.volumeK}K`} sub="Fini Coin" />
-                <StatBox label="Time Left" value={fmtTime(battle.endsInMs)} sub={`ends in ${endsInMin}m`} />
+                <StatBox label="Time Left" value={fmtTime(remainingMs)} sub="until resolution" />
                 <StatBox label="Arena Mood" value={battle.volumeK > 100 ? "Volatile" : "Calm"} sub="intensity" />
               </div>
             </div>
@@ -450,17 +463,16 @@ function BalanceDisplay() {
  * the reference there. (Two cute Finis sketched facing each other.)
  */
 function BattleArenaHero({
-  battle, sideALabel, sideBLabel, sideAPct, sideBPct, color, userBet,
+  battle, endsAt, remainingMs, sideALabel, sideBLabel, sideAPct, sideBPct, color, userBet,
 }: {
   battle: { endsInMs: number; assets: string[]; familyA?: string; familyB?: string; durationLabel?: string };
+  endsAt: number;        // shared anchored end time (single source of truth)
+  remainingMs: number;   // shared live remaining ms (ticks from parent)
   sideALabel: string; sideBLabel: string;
   sideAPct: number; sideBPct: number;
   color: string;
   userBet: { side: "A" | "B"; stake: number } | null;
 }) {
-  // Parse the *total* battle duration from its label ("15m", "1h", "2h", "24h").
-  // `battle.endsInMs` is only the time REMAINING, so we can't use it alone to
-  // compute elapsed%.
   function parseDurationLabel(label?: string): number {
     if (!label) return battle.endsInMs;
     const m = /^(\d+)(m|h)$/.exec(label.trim());
@@ -469,16 +481,11 @@ function BattleArenaHero({
     return m[2] === "h" ? n * 60 * 60 * 1000 : n * 60 * 1000;
   }
   const totalDuration = parseDurationLabel(battle.durationLabel);
-  const initialEndsAt = useState(() => Date.now() + battle.endsInMs)[0];
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(t);
-  }, []);
-  const remaining = Math.max(0, initialEndsAt - now);
-  // Elapsed = total - remaining. Clamped to 0..100%.
+  // Use the SHARED timing from the parent so every clock on the page agrees.
+  const remaining = remainingMs;
+  const startAt = endsAt - totalDuration;
   const elapsedPct = totalDuration > 0
-    ? Math.min(100, Math.max(0, ((totalDuration - remaining) / totalDuration) * 100))
+    ? Math.min(100, Math.max(0, ((Date.now() - startAt) / totalDuration) * 100))
     : 0;
 
   function fmt(ms: number) {
