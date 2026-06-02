@@ -239,12 +239,20 @@ export function LiveMarketCard({
                 <span style={{ width: 10, height: 10, borderRadius: 3, background: col, display: "inline-block" }} />
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>{a}</span>
               </div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: pct == null ? "#bbb" : up ? "#16a34a" : "#dc2626", lineHeight: 1.1, fontFamily: "monospace" }}>
-                {pct == null ? "—" : `${up ? "▲ +" : "▼ "}${pct.toFixed(2)}%`}
+              {/* Current price + % move on the same line — the price is what
+                  the player actually trades against, the % is the move since
+                  open. Both are essential and now equally visible. */}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 26, fontWeight: 900, color: "#111", lineHeight: 1.1, fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
+                  {cur != null ? fmtUsd(cur) : "—"}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: pct == null ? "#bbb" : up ? "#16a34a" : "#dc2626", lineHeight: 1.1, fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
+                  {pct == null ? "" : `${up ? "▲ +" : "▼ "}${pct.toFixed(2)}%`}
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
-                {open != null && cur != null
-                  ? `${fmtUsd(open)} → ${fmtUsd(cur)}`
+              <div style={{ fontSize: 11, color: "#999", marginTop: 3 }}>
+                {open != null
+                  ? `opened ${fmtUsd(open)}`
                   : "waiting for price feed…"}
               </div>
             </div>
