@@ -99,7 +99,18 @@ export interface Strategy {
 }
 
 interface StrategiesState {
+  /** All strategies, partitioned per owning wallet (each dev/bot/holder has
+   *  their own deployed auto-attacks). */
+  strategiesByWallet: Record<string, Strategy[]>;
+  /** The wallet whose strategies are "active" — mirrors into `strategies`. */
+  activeWallet: string | null;
+  /** Mirror of the active wallet's list — components reading `s.strategies`
+   *  continue to work unchanged. Kept in sync by every mutation. */
   strategies: Strategy[];
+
+  /** Switch the active wallet. Empty list created if unseen. */
+  useWallet: (wallet: string) => void;
+
   create: (s: Omit<Strategy, "id" | "createdAt" | "stats" | "budget"> & {
     budgetAllocated: number;
   }) => { strategy: Strategy; deductFromWallet: number } | { error: string };
@@ -160,8 +171,38 @@ export const MARKET_CONDITION_META: Record<MarketCondition, { label: string; ico
 
 export const useStrategies = create<StrategiesState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // Mutate the active wallet's strategies AND keep the `strategies` mirror
+      // in sync, so every existing `set(state => ({ strategies: ... }))` call
+      // works untouched by routing through here.
+      const updateStrategies = (fn: (list: Strategy[]) => Strategy[]) => {
+        const w = get().activeWallet;
+        if (!w) {
+          // No active wallet yet (page mounted before impersonation). Fall back
+          // to mirror-only writes so the deploy flow still works pre-impersonation.
+          set(state => ({ strategies: fn(state.strategies) }));
+          return;
+        }
+        const map = get().strategiesByWallet;
+        const next = fn(map[w] ?? []);
+        set({ strategies: next, strategiesByWallet: { ...map, [w]: next } });
+      };
+
+      return {
+      strategiesByWallet: {},
+      activeWallet: null,
       strategies: [],
+
+      useWallet: (wallet) => {
+        const w = wallet.toLowerCase();
+        const map = get().strategiesByWallet;
+        const list = map[w] ?? [];
+        set({
+          activeWallet: w,
+          strategies: list,
+          strategiesByWallet: map[w] ? map : { ...map, [w]: [] },
+        });
+      },
 
       create: (input) => {
         if (input.budgetAllocated < input.stake) {
@@ -187,32 +228,32 @@ export const useStrategies = create<StrategiesState>()(
           stopConditions: input.stopConditions,
           stats: { ...emptyStats, lastResetDate: todayKey() },
         };
-        set(state => ({ strategies: [strategy, ...state.strategies] }));
+        updateStrategies(list => [strategy, ...list]);
         return { strategy, deductFromWallet: input.budgetAllocated };
       },
 
-      update: (id, patch) => set(state => ({
-        strategies: state.strategies.map(s => s.id === id ? { ...s, ...patch } : s),
-      })),
+      update: (id, patch) => updateStrategies(list =>
+        list.map(s => s.id === id ? { ...s, ...patch } : s)
+      ),
 
-      toggle: (id) => set(state => ({
-        strategies: state.strategies.map(s => {
+      toggle: (id) => updateStrategies(list =>
+        list.map(s => {
           if (s.id !== id) return s;
           // Manual toggle clears any auto-pause reason
           return { ...s, enabled: !s.enabled, pausedReason: !s.enabled ? undefined : "manual" };
-        }),
-      })),
+        })
+      ),
 
-      pause: (id, reason) => set(state => ({
-        strategies: state.strategies.map(s => s.id === id ? { ...s, enabled: false, pausedReason: reason } : s),
-      })),
+      pause: (id, reason) => updateStrategies(list =>
+        list.map(s => s.id === id ? { ...s, enabled: false, pausedReason: reason } : s)
+      ),
 
       retire: (id) => {
         const s = get().strategies.find(x => x.id === id);
         if (!s) return null;
         // Refund remaining budget + saved profits to the wallet
         const refund = s.budget.remaining + s.budget.savedProfits;
-        set(state => ({ strategies: state.strategies.filter(x => x.id !== id) }));
+        updateStrategies(list => list.filter(x => x.id !== id));
         return { refund };
       },
 
@@ -220,11 +261,9 @@ export const useStrategies = create<StrategiesState>()(
         const s = get().strategies.find(x => x.id === id);
         if (!s) return false;
         if (s.budget.remaining < amount) return false;
-        set(state => ({
-          strategies: state.strategies.map(x => x.id === id
-            ? { ...x, budget: { ...x.budget, remaining: x.budget.remaining - amount } }
-            : x),
-        }));
+        updateStrategies(list => list.map(x => x.id === id
+          ? { ...x, budget: { ...x.budget, remaining: x.budget.remaining - amount } }
+          : x));
         return true;
       },
 
@@ -268,47 +307,51 @@ export const useStrategies = create<StrategiesState>()(
           autoPauseReason = "budget_exhausted";
         }
 
-        set(state => ({
-          strategies: state.strategies.map(x => x.id === id ? {
-            ...x,
-            budget: { ...x.budget, remaining: nextRemaining, savedProfits: nextSaved },
-            stats: nextStats,
-            ...(autoPauseReason ? { enabled: false, pausedReason: autoPauseReason } : {}),
-          } : x),
-        }));
+        updateStrategies(list => list.map(x => x.id === id ? {
+          ...x,
+          budget: { ...x.budget, remaining: nextRemaining, savedProfits: nextSaved },
+          stats: nextStats,
+          ...(autoPauseReason ? { enabled: false, pausedReason: autoPauseReason } : {}),
+        } : x));
       },
 
       recordForecast: (id) => {
         const today = todayKey();
-        set(state => ({
-          strategies: state.strategies.map(s => {
-            if (s.id !== id) return s;
-            const dayChanged = s.stats.lastResetDate !== today;
-            return {
-              ...s,
-              stats: {
-                ...s.stats,
-                forecastsToday: (dayChanged ? 0 : s.stats.forecastsToday) + 1,
-                totalForecasts: s.stats.totalForecasts + 1,
-                lastTriggeredAt: Date.now(),
-                lastResetDate: today,
-              },
-            };
-          }),
+        updateStrategies(list => list.map(s => {
+          if (s.id !== id) return s;
+          const dayChanged = s.stats.lastResetDate !== today;
+          return {
+            ...s,
+            stats: {
+              ...s.stats,
+              forecastsToday: (dayChanged ? 0 : s.stats.forecastsToday) + 1,
+              totalForecasts: s.stats.totalForecasts + 1,
+              lastTriggeredAt: Date.now(),
+              lastResetDate: today,
+            },
+          };
         }));
       },
 
       resetDailyIfStale: () => {
         const today = todayKey();
-        set(state => ({
-          strategies: state.strategies.map(s =>
-            s.stats.lastResetDate === today ? s : {
-              ...s, stats: { ...s.stats, forecastsToday: 0, lastResetDate: today },
-            }
-          ),
-        }));
+        updateStrategies(list => list.map(s =>
+          s.stats.lastResetDate === today ? s : {
+            ...s, stats: { ...s.stats, forecastsToday: 0, lastResetDate: today },
+          }
+        ));
       },
-    }),
-    { name: "fini-strategies-v2" } // v2 = budget model. Old v1 entries won't migrate cleanly.
+      };  // end of returned state object
+    },    // end of factory function
+    {
+      // v3 = per-wallet strategies. Old v2 single-wallet state won't migrate;
+      // existing deploys reset and refund nothing (acceptable in beta).
+      name: "fini-strategies-v3",
+      partialize: (s) => ({
+        strategiesByWallet: s.strategiesByWallet,
+        activeWallet: s.activeWallet,
+        strategies: s.strategies,
+      }),
+    }
   )
 );

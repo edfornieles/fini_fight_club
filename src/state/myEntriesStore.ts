@@ -1,9 +1,17 @@
 /**
- * My Entries — the user's active battle predictions across the Crypto Arena.
+ * My Entries — the user's active battle predictions, per wallet.
  *
- * Persisted to localStorage so they survive reloads and navigation. When the
- * real backend is wired up this is the local cache mirror of the server's
- * `predictions` table.
+ * Each connected/impersonated wallet keeps its OWN list of entries. Switching
+ * accounts in DevWalletSwitcher (or via a real MetaMask connect) swaps the
+ * active list — every dev/bot/holder you "play as" has its own track record.
+ * Persisted to localStorage so they survive reloads.
+ *
+ * Shape (v2):
+ *   entriesByWallet: Record<wallet, MyEntry[]>
+ *   activeWallet:    the wallet whose list is "live"
+ *   entries:         mirror of the active wallet's list (for components
+ *                    that read `s.entries` directly — kept in sync on every
+ *                    mutation so React subscriptions still fire correctly)
  */
 
 import { create } from "zustand";
@@ -36,39 +44,79 @@ export interface MyEntry {
 }
 
 interface MyEntriesState {
+  /** All entries, keyed by the owning wallet. */
+  entriesByWallet: Record<string, MyEntry[]>;
+  /** The wallet whose entries are currently "active". */
+  activeWallet: string | null;
+  /** Mirror of the active wallet's entries — so existing `s.entries` reads keep working. */
   entries: MyEntry[];
+
+  /** Switch the active wallet (called when the player impersonates a dev/bot or
+   *  connects a real wallet). Creates an empty list if unseen. */
+  useWallet: (wallet: string) => void;
+
   add: (entry: Omit<MyEntry, "placedAt" | "status"> & { placedAt?: number; status?: MyEntry["status"] }) => void;
   remove: (battleId: string) => void;
-  /** Wipe everything (used by the run-restart flow). */
+  /** Wipe everything for the active wallet (used by the run-restart flow). */
   clearAll: () => void;
-  /** Returns the user's open entry on a given battle if any. */
+  /** Returns the active wallet's entry on a given battle if any. */
   getForBattle: (battleId: string) => MyEntry | undefined;
   /** Settle an open entry. winningSide=null means void/draw (stake refunded). */
   resolveEntry: (battleId: string, winningSide: "A" | "B" | null) => MyEntry | null;
   /** Sell an open position early at the given current value. Marks it "sold". */
   sellEntry: (battleId: string, value: number) => MyEntry | null;
-  /** Drop settled entries older than maxAgeMs to keep the list tidy. */
+  /** Drop settled entries older than maxAgeMs (active wallet only). */
   pruneSettled: (maxAgeMs: number) => void;
+}
+
+/** Merge entries: replace by battleId if present, otherwise prepend (idempotent). */
+function upsert(arr: MyEntry[], entry: MyEntry): MyEntry[] {
+  const filtered = arr.filter(b => b.battleId !== entry.battleId);
+  return [entry, ...filtered];
+}
+
+/** Mutate the active wallet's list AND keep the mirror in sync. */
+function mutateActive(get: () => MyEntriesState, set: (partial: Partial<MyEntriesState>) => void, fn: (list: MyEntry[]) => MyEntry[]) {
+  const w = get().activeWallet;
+  if (!w) return;
+  const map = get().entriesByWallet;
+  const next = fn(map[w] ?? []);
+  set({
+    entries: next,
+    entriesByWallet: { ...map, [w]: next },
+  });
 }
 
 export const useMyEntries = create<MyEntriesState>()(
   persist(
     (set, get) => ({
+      entriesByWallet: {},
+      activeWallet: null,
       entries: [],
-      add: (entry) => set(state => {
-        // If an entry on this battle already exists, replace it (idempotent).
-        const filtered = state.entries.filter(b => b.battleId !== entry.battleId);
-        return {
-          entries: [{
-            ...entry,
-            placedAt: entry.placedAt ?? Date.now(),
-            status: entry.status ?? "open",
-          }, ...filtered],
-        };
-      }),
-      remove: (battleId) => set(state => ({ entries: state.entries.filter(b => b.battleId !== battleId) })),
-      clearAll: () => set({ entries: [] }),
+
+      useWallet: (wallet) => {
+        const w = wallet.toLowerCase();
+        const map = get().entriesByWallet;
+        const list = map[w] ?? [];
+        set({
+          activeWallet: w,
+          entries: list,
+          entriesByWallet: map[w] ? map : { ...map, [w]: [] },
+        });
+      },
+
+      add: (entry) => mutateActive(get, set, list => upsert(list, {
+        ...entry,
+        placedAt: entry.placedAt ?? Date.now(),
+        status: entry.status ?? "open",
+      })),
+
+      remove: (battleId) => mutateActive(get, set, list => list.filter(b => b.battleId !== battleId)),
+
+      clearAll: () => mutateActive(get, set, () => []),
+
       getForBattle: (battleId) => get().entries.find(b => b.battleId === battleId),
+
       resolveEntry: (battleId, winningSide) => {
         const entry = get().entries.find(e => e.battleId === battleId);
         if (!entry || entry.status !== "open") return null;
@@ -88,11 +136,10 @@ export const useMyEntries = create<MyEntriesState>()(
           status: voided ? "voided" : won ? "won" : "lost",
           result: { settledAt: Date.now(), payout, netProfit, winningSide },
         };
-        set(state => ({
-          entries: state.entries.map(e => e.battleId === battleId ? settled : e),
-        }));
+        mutateActive(get, set, list => list.map(e => e.battleId === battleId ? settled : e));
         return settled;
       },
+
       sellEntry: (battleId, value) => {
         const entry = get().entries.find(e => e.battleId === battleId);
         if (!entry || entry.status !== "open") return null;
@@ -102,21 +149,27 @@ export const useMyEntries = create<MyEntriesState>()(
           soldFor: value,
           result: { settledAt: Date.now(), payout: value, netProfit: value - entry.stake, winningSide: null },
         };
-        set(state => ({
-          entries: state.entries.map(e => e.battleId === battleId ? sold : e),
-        }));
+        mutateActive(get, set, list => list.map(e => e.battleId === battleId ? sold : e));
         return sold;
       },
+
       pruneSettled: (maxAgeMs) => {
         const now = Date.now();
-        set(state => ({
-          entries: state.entries.filter(e =>
-            e.status === "open" || !e.result || (now - e.result.settledAt) < maxAgeMs
-          ),
-        }));
+        mutateActive(get, set, list => list.filter(e =>
+          e.status === "open" || !e.result || (now - e.result.settledAt) < maxAgeMs
+        ));
       },
     }),
-    { name: "fini-myentries-v1" }
+    {
+      // v2: per-wallet shape change → new storage key so legacy v1 state
+      // doesn't crash the new code on first load.
+      name: "fini-myentries-v2",
+      partialize: (s) => ({
+        entriesByWallet: s.entriesByWallet,
+        activeWallet: s.activeWallet,
+        entries: s.entries,
+      }),
+    }
   )
 );
 

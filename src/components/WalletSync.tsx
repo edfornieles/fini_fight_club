@@ -17,6 +17,21 @@ export function WalletSync() {
   const { walletAddress, connectWallet, disconnectWallet } = useUIStore();
   useSiweAuth(); // side effect — runs SIWE on connect
 
+  // On first mount, sync every per-wallet store to the persisted walletAddress
+  // so balance, entries, and strategies all match the account the player was
+  // last using. Without this, a page reload could leave a previously-active
+  // dev account showing the wrong list because the other stores persist their
+  // own activeWallet independently.
+  useEffect(() => {
+    if (!walletAddress) return;
+    const a = walletAddress.toLowerCase();
+    useCoinStore.getState().useWallet(a, 1_000);
+    import("../state/myEntriesStore").then(({ useMyEntries }) => useMyEntries.getState().useWallet(a));
+    import("../state/strategiesStore").then(({ useStrategies }) => useStrategies.getState().useWallet(a));
+    // Run only on mount — subsequent wallet changes go through the effect below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     // In dev-impersonation mode the wallet is set manually via DevWalletSwitcher.
     // Don't let wagmi's "not connected" state wipe it.
@@ -26,8 +41,11 @@ export function WalletSync() {
     if (isConnected && address && address.toLowerCase() !== walletAddress) {
       const a = address.toLowerCase();
       connectWallet(a);
-      // Load this connected wallet's own balance.
+      // Switch every per-wallet store in lockstep so balance, active battles,
+      // AND deployed auto-attacks all follow the connected account.
       useCoinStore.getState().useWallet(a, 1_000);
+      import("../state/myEntriesStore").then(({ useMyEntries }) => useMyEntries.getState().useWallet(a));
+      import("../state/strategiesStore").then(({ useStrategies }) => useStrategies.getState().useWallet(a));
     } else if (!isConnected && walletAddress && !devMode) {
       disconnectWallet();
     }

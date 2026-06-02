@@ -95,7 +95,11 @@ export function DevWalletSwitcher() {
     // Switch to THIS account's own balance. Fresh dev accounts seed at 1,000;
     // bots/funded wallets pull their real Supabase balance. Each account keeps
     // its own balance that changes as it plays.
+    // Switch every per-wallet store in lockstep so balance, active battles,
+    // AND deployed auto-attacks all follow the account you're playing as.
     useCoinStore.getState().useWallet(a, 1_000);
+    import("../state/myEntriesStore").then(({ useMyEntries }) => useMyEntries.getState().useWallet(a));
+    import("../state/strategiesStore").then(({ useStrategies }) => useStrategies.getState().useWallet(a));
     setOpen(false);
   }
   function disconnect() {
