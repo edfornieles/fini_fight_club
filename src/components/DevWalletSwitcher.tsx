@@ -56,6 +56,7 @@ export function DevWalletSwitcher() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [mid, setMid] = useState<string>("");
+  const [bots, setBots] = useState<{ wallet_address: string; handle: string; strategy_type: string }[]>([]);
 
   useEffect(() => {
     setVisible(isDevModeEnabled());
@@ -75,6 +76,14 @@ export function DevWalletSwitcher() {
       );
       if (midTier) setMid(midTier.wallet);
     }).catch(() => { /* ignore */ });
+
+    // Load house bots from Supabase so you can "play as" each one (admin view).
+    const sbUrl = (import.meta as { env?: { VITE_SUPABASE_URL?: string; VITE_SUPABASE_ANON_KEY?: string } }).env;
+    if (sbUrl?.VITE_SUPABASE_URL && sbUrl?.VITE_SUPABASE_ANON_KEY) {
+      fetch(`${sbUrl.VITE_SUPABASE_URL}/rest/v1/house_bots?active=eq.true&select=wallet_address,handle,strategy_type&order=handle&limit=30`, {
+        headers: { apikey: sbUrl.VITE_SUPABASE_ANON_KEY, Authorization: `Bearer ${sbUrl.VITE_SUPABASE_ANON_KEY}` },
+      }).then(r => r.ok ? r.json() : []).then(rows => { if (Array.isArray(rows)) setBots(rows); }).catch(() => { /* ignore */ });
+    }
   }, [visible, mid]);
 
   if (!visible) return null;
@@ -139,6 +148,23 @@ export function DevWalletSwitcher() {
               <span>📊 Mid holder (live)</span>
               <span style={{ color: "#888", fontSize: 11, fontFamily: "monospace" }}>{mid.slice(0,6)}…{mid.slice(-4)}</span>
             </button>
+          )}
+
+          {/* House bots — play as any of them to inspect their account */}
+          {bots.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: "#777", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                🤖 House bots ({bots.length})
+              </div>
+              <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                {bots.map(b => (
+                  <button key={b.wallet_address} onClick={() => impersonate(b.wallet_address)} style={btnRow}>
+                    <span>{b.handle}</span>
+                    <span style={{ color: "#888", fontSize: 10 }}>{b.strategy_type}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {walletAddress && (

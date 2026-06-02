@@ -108,7 +108,7 @@ values (
   'Genesis Holder Claim',
   now(),
   now() + interval '90 days',
-  10000,
-  10000000,
+  200,        -- per-Fini claim: 10,000 tokens × 200 = 2,000,000 = 20% of the 10M supply
+  2000000,    -- holder allocation cap (20% of total). Remaining 80% lives in the project wallet.
   'active'
 ) on conflict (id) do nothing;

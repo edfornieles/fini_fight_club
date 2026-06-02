@@ -97,8 +97,17 @@ export function BattlePage() {
     } catch (e) {
       // Backend not deployed — that's fine in dev mode. The local FINI$ debit
       // above already happened; treat this as a successful local prediction.
-      const msg = e instanceof Error ? e.message : "predict_failed";
-      if (msg.includes("offline") || msg.includes("Failed to fetch") || msg.includes("backend") || msg.includes("network")) {
+      const msg = (e instanceof Error ? e.message : "predict_failed").toLowerCase();
+      // In play-money beta, predictions are local-first. The backend exists but
+      // requires a real SIWE session; dev-impersonated players have none, so an
+      // auth error (401/403/unauthorized/jwt) is expected — treat it like
+      // offline and settle locally rather than surfacing a scary "HTTP 401".
+      const isAuthOrNetwork =
+        msg.includes("offline") || msg.includes("failed to fetch") ||
+        msg.includes("backend") || msg.includes("network") ||
+        msg.includes("401") || msg.includes("403") ||
+        msg.includes("unauthorized") || msg.includes("jwt") || msg.includes("no auth");
+      if (isAuthOrNetwork) {
         setPredictResult({ ok: true, side: selectedSide, stake: amount });
         persistEntry(selectedSide, amount);
       } else {

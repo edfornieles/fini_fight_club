@@ -251,6 +251,21 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
         <span style={{ color: "#aaa", fontSize: 10 }}>{totalForecasts} total forecasts placed</span>
       </div>
 
+      {/* Performance review — plain-English "did it work, and why" */}
+      {settled >= 3 && (
+        <div style={{
+          background: netProfit > 0 ? "#f0fdf4" : netProfit < 0 ? "#fef2f2" : "#f8fafc",
+          border: `1px solid ${netProfit > 0 ? "#bbf7d0" : netProfit < 0 ? "#fecaca" : "#e8edf2"}`,
+          borderRadius: 10, padding: "10px 12px", marginBottom: 12,
+          fontSize: 11, color: "#475569", fontWeight: 600, lineHeight: 1.5,
+        }}>
+          <span style={{ fontWeight: 800, color: "#334155" }}>
+            {netProfit > 0 ? "📈 Working" : netProfit < 0 ? "📉 Underwater" : "➖ Break-even"}:
+          </span>{" "}
+          {strategyInsight(strategy, { wins, losses, voided, winRate, netProfit })}
+        </div>
+      )}
+
       {/* Actions */}
       <div style={{ display: "flex", gap: 6 }}>
         <button onClick={() => toggle(strategy.id)} style={{
@@ -791,3 +806,42 @@ const inputStyle: React.CSSProperties = {
   border: "1.5px solid #e5e7eb", fontSize: 13, fontWeight: 600, color: "#111",
   fontFamily: "'Nunito', system-ui, sans-serif", boxSizing: "border-box",
 };
+
+/**
+ * Plain-English performance review for a strategy: why it's working or not,
+ * grounded in its actual win rate + the nature of the strategy type.
+ */
+function strategyInsight(
+  strategy: Strategy,
+  s: { wins: number; losses: number; voided: number; winRate: number | null; netProfit: number },
+): string {
+  const wr = s.winRate ?? 50;
+  const edge = strategy.params.minEdgePp;
+  const type = strategy.type;
+  const bits: string[] = [];
+
+  // Win-rate read
+  if (wr >= 58) bits.push(`a strong ${wr}% hit rate is carrying it`);
+  else if (wr >= 52) bits.push(`a slight ${wr}% edge is enough to stay green`);
+  else if (wr >= 48) bits.push(`a near-coin-flip ${wr}% hit rate`);
+  else bits.push(`only ${wr}% of calls are landing`);
+
+  // Strategy-type colour
+  const typeNote: Record<string, string> = {
+    momentum: "chasing the leading side works best in trending markets and bleeds in chop",
+    contrarian: "fading the crowd pays when favourites are overpriced, but a strong trend punishes it",
+    loyalist: "a fixed-side bet lives or dies on whether that side is genuinely favoured",
+    flat_bias: "a pure one-side bias is a benchmark — beating 50% means the side had a real edge",
+    late_joiner: "joining late backs near-certain winners for small, steady gains",
+    momentum_underlying: "reading real 5-minute velocity catches genuine moves the crowd hasn't priced",
+    mean_reversion: "betting against spikes wins when moves overshoot and snaps back, loses in breakouts",
+    late_sniper: "acting in the final seconds on the real price is close to riskless when the feed is clean",
+  };
+  if (typeNote[type]) bits.push(typeNote[type]);
+
+  // Edge-gate note
+  if (edge && edge > 0) bits.push(`the ${edge}pp edge gate keeps it selective — fewer trades, higher quality`);
+  else bits.push("consider adding an edge gate to skip low-conviction trades");
+
+  return bits.join("; ") + ".";
+}
