@@ -10,10 +10,10 @@ import { api } from "../lib/api";
 import { LiveMarketCard } from "../components/PriceGraph";
 import { WinnerBanner } from "../components/WinnerBanner";
 import { RelatedMarkets } from "../components/RelatedMarkets";
+import { PastResolutions } from "../components/PastResolutions";
 import { useLiveActivity, getBattleVolume } from "../hooks/useLiveActivity";
 import { useLivePrices } from "../hooks/useLivePrices";
-import { useCryptoSim, useSimBattles, useSimFeed, battleEndsAtMs } from "../data/cryptoSim";
-import { personaFor } from "../lib/ghostPersonas";
+import { useCryptoSim, useSimBattles, battleEndsAtMs } from "../data/cryptoSim";
 import { openingFor, intraWindowReturn } from "../lib/openingPrices";
 import { getCachedPrices } from "../lib/priceProviders";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
@@ -41,7 +41,54 @@ export function BattlePage() {
   const startSim = useCryptoSim(s => s.start);
   useEffect(() => { startSim(); }, [startSim]);
   const simBattles = useSimBattles();
-  const battle = simBattles.find(b => b.id === battleId) ?? getBattleById(battleId);
+  const [serverBattle, setServerBattle] = useState<ReturnType<typeof getBattleById> | null>(null);
+  // Local-first lookup, then fall back to Supabase for resolved server-spawned
+  // instances (e.g. visiting /battle/btc-updown-1h:2026-05-29 from the Past
+  // Resolutions picker — that ID isn't in the sim or the mock list).
+  const battle = simBattles.find(b => b.id === battleId) ?? getBattleById(battleId) ?? serverBattle;
+  useEffect(() => {
+    if (!battleId) return;
+    if (simBattles.find(b => b.id === battleId)) { setServerBattle(null); return; }
+    if (getBattleById(battleId)) { setServerBattle(null); return; }
+    // Pull from Supabase battle_instances. Map to the client Battle shape so
+    // the rest of the page renders unchanged.
+    let alive = true;
+    (async () => {
+      try {
+        const { supabase } = await import("../lib/supabase");
+        const { data } = await supabase
+          .from("battle_instances")
+          .select("id,template_id,asset_a,asset_b,start_time,end_time,status,winning_side,official_start_price_a,official_end_price_a,official_start_price_b,official_end_price_b")
+          .eq("id", battleId)
+          .maybeSingle();
+        if (!alive || !data) return;
+        const totalDurationMs = new Date(data.end_time).getTime() - new Date(data.start_time).getTime();
+        const isOutperform = !!data.asset_b;
+        const durMin = Math.round(totalDurationMs / 60_000);
+        const durLabel = durMin >= 60 ? `${Math.round(durMin / 60)}h` : `${durMin}m`;
+        const sideALabel = isOutperform ? data.asset_a : "Up";
+        const sideBLabel = isOutperform ? data.asset_b : "Down";
+        setServerBattle({
+          id: data.id,
+          title: isOutperform ? `${data.asset_a} vs ${data.asset_b}` : `${data.asset_a} ${data.status === "resolved" ? "(resolved)" : ""}`,
+          question: isOutperform
+            ? `Did ${data.asset_a} outperform ${data.asset_b}?`
+            : `Did ${data.asset_a} close higher than open?`,
+          type: isOutperform ? "outperform" : "updown",
+          status: data.status === "resolved" ? "resolved" : "live",
+          assets: isOutperform ? [data.asset_a, data.asset_b!] : [data.asset_a],
+          sideA: { label: sideALabel, pct: 50, color: "#22c55e" },
+          sideB: { label: sideBLabel, pct: 50, color: "#ef4444" },
+          volumeK: 0,
+          endsInMs: Math.max(0, new Date(data.end_time).getTime() - Date.now()),
+          familyA: data.asset_a,
+          familyB: data.asset_b ?? undefined,
+          durationLabel: durLabel,
+        });
+      } catch { /* leave null — "not found" UI will show */ }
+    })();
+    return () => { alive = false; };
+  }, [battleId, simBattles]);
   const [stake, setStake] = useState("100");
   const [selectedSide, setSelectedSide] = useState<"A" | "B" | null>(null);
   const [predicting, setPredicting] = useState(false);
@@ -230,10 +277,13 @@ export function BattlePage() {
                 </span>
               </div>
               <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111", margin: "0 0 4px" }}>{battle.title}</h1>
-              {/* Real round window in the player's local time. Verifiable
-                  reference — they can check the price feed at this exact slot. */}
-              <div style={{ fontSize: 12, color: "#888", fontWeight: 600, marginBottom: 10 }}>
-                {fmtWindow(endsAt - parseDur(battle.durationLabel), endsAt)}
+              {/* Real round window in the player's local time + a picker for
+                  past resolved rounds of the same template (archive). */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, color: "#888", fontWeight: 600 }}>
+                  {fmtWindow(endsAt - parseDur(battle.durationLabel), endsAt)}
+                </div>
+                <PastResolutions currentBattleId={battle.id} />
               </div>
               <p style={{ fontSize: 16, color: "#555", fontWeight: 600, margin: "0 0 12px", lineHeight: 1.5 }}>{battle.question}</p>
               {/* Stated resolution rule — the contract, up front */}
@@ -806,7 +856,6 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
   // Real Supabase predictions on this battle (replaces the synthetic feed).
   // Falls back to local sim if Supabase is offline.
   const { events: liveEvents } = useLiveActivity({ battleId: battle.id, limit: 8, pollMs: 6000 });
-  const simFeed = useSimFeed();
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 2000);
@@ -841,17 +890,13 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
   };
   const ago = (ts: number) => { const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return `${s}s ago`; const m = Math.floor(s/60); return `${m}m ago`; };
 
-  // Recent real predictions on this battle (newest first), capped.
-  // Source: Supabase predictions table via useLiveActivity. If that's
-  // empty or offline, fall back to the local sim feed so the UI still has
-  // signs of life during dev / offline.
+  // Recent real predictions on this battle. ONLY real bot/user bets from
+  // Supabase — never the synthetic Fight Club holder sim. If empty (e.g.
+  // mock-only battle id with no server instance), the section hides itself.
   type FeedItem = { id: string | number; handle: string; isBot: boolean; side: "A" | "B"; stake: number; at: number };
-  const battleBets: FeedItem[] = liveEvents.length > 0
-    ? liveEvents.map(e => ({ id: e.id, handle: e.handle, isBot: e.isBot, side: e.side, stake: e.stake, at: e.at }))
-    : simFeed.filter(f => f.battleId === battle.id).slice(0, 6).map(f => ({
-        id: f.id, handle: personaFor(f.wallet).handle, isBot: false,
-        side: f.side, stake: f.amount, at: f.at,
-      }));
+  const battleBets: FeedItem[] = liveEvents.map(e => ({
+    id: e.id, handle: e.handle, isBot: e.isBot, side: e.side, stake: e.stake, at: e.at,
+  }));
 
   type LogRow = { ts: number; tone: "open" | "bet" | "info" | "result"; text: string };
   const rows: LogRow[] = [];
