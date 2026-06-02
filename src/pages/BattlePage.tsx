@@ -594,8 +594,26 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
   const cur = getCachedPrices()?.[asset]?.usd ?? null;
   const ended = battle.endsInMs <= 0;
 
+  // Real battle timing in the player's local timezone — verifiable.
+  // endsAt is the authoritative resolution time; startAt = endsAt - duration.
+  const totalDurationMs = (() => {
+    const m = /^(\d+)(m|h)$/.exec(battle.durationLabel ?? "");
+    if (!m) return 60 * 60 * 1000;
+    return Number(m[1]) * (m[2] === "h" ? 3_600_000 : 60_000);
+  })();
+  const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
+  const startedAt = endsAt - totalDurationMs;
+
   const fmtUsd = (n: number) => n >= 1000 ? "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 }) : n >= 1 ? "$" + n.toFixed(2) : "$" + n.toFixed(4);
   const fmtClock = (ts: number) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`; };
+  // Full local-time stamp for the battle-start row (date + time + tz abbrev).
+  const fmtLocal = (ts: number) => {
+    const d = new Date(ts);
+    const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const tz = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(d).find(p => p.type === "timeZoneName")?.value ?? "";
+    return `${date}, ${time} ${tz}`;
+  };
   const ago = (ts: number) => { const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return `${s}s ago`; const m = Math.floor(s/60); return `${m}m ago`; };
 
   // Recent real predictions on this battle (newest first), cap 6
@@ -604,9 +622,20 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
   type LogRow = { ts: number; tone: "open" | "bet" | "info" | "result"; text: string };
   const rows: LogRow[] = [];
 
-  // Opening line
+  // Opening line — real local-time start + real opening price (verifiable).
   if (opening != null) {
-    rows.push({ ts: 0, tone: "open", text: `Battle opened — ${asset} at ${fmtUsd(opening)}` });
+    rows.push({
+      ts: startedAt,
+      tone: "open",
+      text: `Battle started ${fmtLocal(startedAt)} — ${asset} at ${fmtUsd(opening)}`,
+    });
+  } else {
+    // Even before the opening price is captured, the start time is known.
+    rows.push({
+      ts: startedAt,
+      tone: "open",
+      text: `Battle started ${fmtLocal(startedAt)}`,
+    });
   }
 
   // Current standing
@@ -615,10 +644,10 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
     const up = pct >= 0;
     const leading = up ? battle.sideA.label : battle.sideB.label;
     rows.push({
-      ts: 1,
+      ts: ended ? endsAt : Date.now(),
       tone: ended ? "result" : "info",
       text: ended
-        ? `Settled — ${asset} closed ${fmtUsd(cur)} (${up ? "+" : ""}${pct.toFixed(2)}% since open). ${leading} wins.`
+        ? `Settled ${fmtLocal(endsAt)} — ${asset} closed ${fmtUsd(cur)} (${up ? "+" : ""}${pct.toFixed(2)}% since open). ${leading} wins.`
         : `${asset} now ${fmtUsd(cur)} — ${up ? "▲ +" : "▼ "}${pct.toFixed(2)}% since open · ${leading} leading`,
     });
   }

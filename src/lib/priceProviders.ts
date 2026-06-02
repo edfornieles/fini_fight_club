@@ -70,6 +70,21 @@ export async function fetchPricesMulti(): Promise<LivePrices> {
   const cached = getCachedPrices();
   if (cached) return cached;
 
+  // 0. Try our same-origin proxy first. This bypasses ad-blockers / privacy
+  //    extensions that block api.coingecko.com / coinbase / binance directly
+  //    (very common in Chrome → graphs froze, UNI never appeared). The proxy
+  //    runs as a Cloudflare Pages Function and returns the same shape.
+  try {
+    const r = await withTimeout(fetch("/api/prices"), CG_TIMEOUT_MS);
+    if (r.ok) {
+      const j = await r.json() as LivePrices;
+      if (j && Object.keys(j).length >= 5) {
+        _cache = { data: j, fetchedAt: Date.now() };
+        return j;
+      }
+    }
+  } catch { /* fall through to direct providers */ }
+
   // Try CoinGecko first (one batched call)
   const cgResult = await tryCoinGecko().catch(() => null);
 
