@@ -42,6 +42,7 @@ import { ChallengePage } from "./pages/ChallengePage";
 import { TournamentPage } from "./pages/TournamentPage";
 import { StrategiesPage } from "./pages/StrategiesPage";
 import { AdminBotsPage } from "./pages/AdminBotsPage";
+import { Fini3DTestPage } from "./pages/Fini3DTestPage";
 
 export default function App() {
   // Battle settlement runs globally so resolutions happen no matter where
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/tournament" element={<TournamentPage />} />
           <Route path="/admin/bots" element={<AdminBotsPage />} />
+          <Route path="/fini-3d-test" element={<Fini3DTestPage />} />
         </Routes>
       </ErrorBoundary>
       {/* Game overlays (modal layers, phase-driven) */}

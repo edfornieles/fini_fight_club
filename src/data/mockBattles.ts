@@ -17,6 +17,8 @@ export interface Battle {
   familyA?: string;
   familyB?: string;
   durationLabel: string;
+  officialStartPrice?: number | null;
+  officialEndPrice?: number | null;
 }
 
 const M = 60 * 1000;

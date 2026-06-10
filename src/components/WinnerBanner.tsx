@@ -18,6 +18,8 @@ type BattleLite = {
   sideA: { label: string; pct: number };
   sideB: { label: string; pct: number };
   durationLabel?: string;
+  officialStartPrice?: number | null;
+  officialEndPrice?: number | null;
 };
 
 function fmtUsd(n: number): string {
@@ -29,8 +31,10 @@ function fmtUsd(n: number): string {
 function determineWinner(battle: BattleLite): { winner: "A" | "B"; reasoning: string; movePct: number | null } {
   if (battle.type === "updown" && battle.assets.length === 1) {
     const sym = battle.assets[0];
-    const opening = openingFor(battle.id, sym);
-    const close = getCachedPrices()?.[sym]?.usd ?? null;
+    // Prefer the server's official prices — they're immutable. Only fall back
+    // to the live feed for battles still in progress (no official end price yet).
+    const opening = battle.officialStartPrice ?? openingFor(battle.id, sym);
+    const close = battle.officialEndPrice ?? getCachedPrices()?.[sym]?.usd ?? null;
     if (opening != null && close != null) {
       const movePct = ((close - opening) / opening) * 100;
       const winner: "A" | "B" = close > opening ? "A" : "B";
@@ -69,10 +73,21 @@ export function WinnerBanner({
   userPayout?: number | null;
   resolutionStatus?: "open" | "pending" | "locked" | "resolving" | "manual_review" | "voided" | "resolved" | null;
 }) {
-  // When the server says manual_review / pending / voided, suppress the
-  // banner entirely — the audit panel covers that state authoritatively
-  // and a confident "X wins" headline would be misleading.
-  if (resolutionStatus === "manual_review" || resolutionStatus === "pending" || resolutionStatus === "voided") {
+  // When the server says manual_review / pending / voided / resolving, or
+  // hasn't yet committed an official end price, suppress the banner — the
+  // Resolution Audit panel covers those states authoritatively, and showing
+  // a tentative "X wins" based on the live feed would cause blinking.
+  if (
+    resolutionStatus === "manual_review" ||
+    resolutionStatus === "pending" ||
+    resolutionStatus === "voided" ||
+    resolutionStatus === "resolving"
+  ) {
+    return null;
+  }
+  // If the battle came from the server and has no official end price yet,
+  // the outcome isn't committed — hide the banner until it is.
+  if (battle.officialStartPrice !== undefined && battle.officialEndPrice == null) {
     return null;
   }
   const [nextId, setNextId] = useState<string | null>(null);

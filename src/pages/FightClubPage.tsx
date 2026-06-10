@@ -1,6 +1,8 @@
 import { asset } from "../lib/assetUrl";
-import { useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
+const FightClubArena3D = lazy(() => import("../components/three/FightClubArena3D"));
 import { useUIStore } from "../state/uiStore";
 import { useCoinStore } from "../state/coinStore";
 import { useCrumbStore } from "../state/crumbStore";
@@ -1028,6 +1030,9 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
   const [round, setRound] = useState(0);
   const [attacker, setAttacker] = useState<{ side: "you" | "them"; idx: number } | null>(null);
   const [defender, setDefender] = useState<{ side: "you" | "them"; idx: number } | null>(null);
+  // Captured once the runTurn loop settles, before onBattleEnd fires — drives
+  // winner/loser clips on the 3D arena during the 1.2s resolution beat.
+  const [outcome, setOutcome] = useState<"you" | "them" | "draw" | null>(null);
   // Playback speed: 1× = 1100ms/turn (default), 2× = 550ms, 4× = 275ms
   const [speed, setSpeed] = useState<1 | 2 | 4>(1);
   const speedRef = useRef(speed);
@@ -1063,6 +1068,7 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
         const result = teamAlive && !oppAlive ? "you" : oppAlive && !teamAlive ? "them" : "draw";
         const verdict = result === "you" ? "🏆 Victory!" : result === "them" ? "💀 Defeat" : "🤝 Draw";
         setLog(l => [...l.slice(-8), { side: "system", msg: verdict, details: result === "you" ? "Your team is the last standing." : result === "them" ? "Your team has fallen." : "Both sides knocked out.", key: Date.now() + Math.random() }]);
+        setOutcome(result);
         setTimeout(() => onBattleEnd(result), 1200 / speedRef.current);
         return;
       }
@@ -1164,6 +1170,21 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* 3D arena — lazy-loaded; falls through to 2D cards below while loading. */}
+        <div style={{ width: "100%", height: 460, marginBottom: 20, borderRadius: 16, overflow: "hidden", background: "#fff0f6", border: "1.5px solid #f0e0ea" }}>
+          <Suspense fallback={<div style={{ padding: 16, color: "#999", fontSize: 13 }}>Loading 3D arena…</div>}>
+            <FightClubArena3D
+              team={team.map(f => ({ tokenId: ((f.id % 10000) + 10000) % 10000 }))}
+              opponent={opponent.map(f => ({ tokenId: ((f.id % 10000) + 10000) % 10000 }))}
+              teamHp={teamHp}
+              oppHp={oppHp}
+              attacker={attacker}
+              defender={defender}
+              outcome={outcome}
+            />
+          </Suspense>
         </div>
 
         {/* Opponent battlefield */}

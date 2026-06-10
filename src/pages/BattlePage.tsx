@@ -84,6 +84,8 @@ export function BattlePage() {
           familyA: data.asset_a,
           familyB: data.asset_b ?? undefined,
           durationLabel: durLabel,
+          officialStartPrice: data.official_start_price_a ?? null,
+          officialEndPrice: data.official_end_price_a ?? null,
         });
       } catch { /* leave null — "not found" UI will show */ }
     })();
@@ -154,6 +156,27 @@ export function BattlePage() {
     }).catch(() => { /* expected in beta */ });
   }
 
+  // Hooks below must run on every render — declaring them after the `!battle`
+  // guard would change the hook count between the pre-load render (battle=null)
+  // and the loaded render, tripping React error #310.
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle?.id));
+  const [realVolume, setRealVolume] = useState<number | null>(null);
+  useEffect(() => {
+    if (!battle) return;
+    let alive = true;
+    const refresh = () => {
+      getBattleVolume(battle.id, 8_000).then(v => { if (alive) setRealVolume(v); });
+    };
+    refresh();
+    const t = setInterval(refresh, 12_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [battle?.id]);
+
   if (!battle) {
     return (
       <div style={{ ...S, padding: "80px 48px", textAlign: "center" }}>
@@ -169,32 +192,7 @@ export function BattlePage() {
   const meta = ASSET_META[primaryAsset];
   const fee = Math.round(Number(stake) * 0.07 * (sideA.pct / 100) * (sideB.pct / 100));
 
-  // ── Single source of truth for time on this page ──────────────────────────
-  // Every clock (title chip, Battle Momentum, the hero) derives from this one
-  // anchored end time + a 1s tick, so they all agree and tick live.
   const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
-  const [nowMs, setNowMs] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  // If the player's entry on this battle has already settled, the battle is
-  // effectively over for them — clamp remaining to 0 so the page can't show
-  // "Resolution in 1h 57m" next to a "🎉 You won" status. (Mock battles in
-  // particular have stale hardcoded endsInMs that can lag the real outcome.)
-  const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle.id));
-  // Real volume for THIS battle from Supabase — sum of every stake placed
-  // (bots + real players). Refreshes every 12s so it tracks live activity.
-  const [realVolume, setRealVolume] = useState<number | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const refresh = () => {
-      getBattleVolume(battle.id, 8_000).then(v => { if (alive) setRealVolume(v); });
-    };
-    refresh();
-    const t = setInterval(refresh, 12_000);
-    return () => { alive = false; clearInterval(t); };
-  }, [battle.id]);
   const playerSettled = playerEntry && playerEntry.status !== "open";
   const remainingMs = playerSettled ? 0 : Math.max(0, endsAt - nowMs);
 

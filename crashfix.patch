@@ -1,0 +1,78 @@
+diff --git a/src/pages/BattlePage.tsx b/src/pages/BattlePage.tsx
+index 62151b7..0fdc756 100644
+--- a/src/pages/BattlePage.tsx
++++ b/src/pages/BattlePage.tsx
+@@ -154,25 +154,12 @@ export function BattlePage() {
+     }).catch(() => { /* expected in beta */ });
+   }
+ 
+-  if (!battle) {
+-    return (
+-      <div style={{ ...S, padding: "80px 48px", textAlign: "center" }}>
+-        <h2>Battle not found</h2>
+-        <Link to="/crypto">← Back to arena</Link>
+-      </div>
+-    );
+-  }
+-
+-  const { sideA, sideB } = battle;
+-  const primaryAsset = battle.assets[0];
+-  const color = ASSET_COLORS[primaryAsset] ?? "#f472b6";
+-  const meta = ASSET_META[primaryAsset];
+-  const fee = Math.round(Number(stake) * 0.07 * (sideA.pct / 100) * (sideB.pct / 100));
+-
+-  // ── Single source of truth for time on this page ──────────────────────────
+-  // Every clock (title chip, Battle Momentum, the hero) derives from this one
+-  // anchored end time + a 1s tick, so they all agree and tick live.
+-  const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
++  // ── Clock + live-volume hooks ─────────────────────────────────────────────
++  // These MUST be declared before the `if (!battle)` guard below. `battle`
++  // resolves from null → loaded asynchronously for server-spawned instances
++  // (and is null on a genuine "not found"), so a hook placed after the guard
++  // changes the hook count between renders → React error #310. They're written
++  // null-safe so they can run on the pre-load / not-found render too.
+   const [nowMs, setNowMs] = useState(Date.now());
+   useEffect(() => {
+     const t = setInterval(() => setNowMs(Date.now()), 1000);
+@@ -182,11 +169,12 @@ export function BattlePage() {
+   // effectively over for them — clamp remaining to 0 so the page can't show
+   // "Resolution in 1h 57m" next to a "🎉 You won" status. (Mock battles in
+   // particular have stale hardcoded endsInMs that can lag the real outcome.)
+-  const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle.id));
++  const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle?.id));
+   // Real volume for THIS battle from Supabase — sum of every stake placed
+   // (bots + real players). Refreshes every 12s so it tracks live activity.
+   const [realVolume, setRealVolume] = useState<number | null>(null);
+   useEffect(() => {
+�:    if (!battle) return;
+     let alive = true;
+     const refresh = () => {
+       getBattleVolume(battle.id, 8_000).then(v => { if (alive) setRealVolume(v); });
+@@ -194,7 +182,27 @@ export function BattlePage() {
+     refresh();
+     const t = setInterval(refresh, 12_000);
+     return () => { alive = false; clearInterval(t); };
+-  }, [battle.id]);
++  }, [battle?.id]);
++
++  if (!battle) {
++    return (
++      <div style={{ ...S, padding: "80px 48px", textAlign: "center" }}>
++        <h2>Battle not found</h2>
++        <Link to="/crypto">← Back to arena</Link>
++      </div>
++    );
++  }
++
++  const { sideA, sideB } = battle;
++  const primaryAsset = battle.assets[0];
++  const color = ASSET_COLORS[primaryAsset] ?? "#f472b6";
++  const meta = ASSET_META[primaryAsset];
++  const fee = Math.round(Number(stake) * 0.07 * (sideA.pct / 100) * (sideB.pct / 100));
++
++  // ── Single source of truth for time on this page ──────────────────────────
++  // Every clock (title chip, Battle Momentum, the hero) derives from this one
++  // anchored end time + the 1s tick (nowMs) declared above the guard.
++  const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
+   const playerSettled = playerEntry && playerEntry.status !== "open";
+   const remainingMs = playerSettled ? 0 : Math.max(0, endsAt - nowMs);
