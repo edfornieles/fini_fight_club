@@ -19,18 +19,19 @@ type FightClubArena3DProps = {
 
 type Vec3 = [number, number, number];
 
-// Per-team slots, depth-staggered in a shallow arc so all three read distinctly
-// once the fighters are in profile. Tight gap + near-frontal camera = the
-// big-fighter framing of Jakub's reference build (battles.pixelsolve.net).
+// Per-team slots in a receding diagonal line (the reference-build stance from
+// battles.pixelsolve.net): teammates spread evenly across the screen, the
+// closest fighter nearest the center gap, none overlapping from the frontal
+// camera.
 const TEAM_POS: Vec3[] = [
-  [-2.6, 0, -1.7],
-  [-3.1, 0,  0.0],
-  [-2.6, 0,  1.7],
+  [-2.0, 0,  1.4],
+  [-3.2, 0,  0.0],
+  [-4.4, 0, -1.4],
 ];
 const OPP_POS: Vec3[] = [
-  [ 2.6, 0, -1.7],
-  [ 3.1, 0,  0.0],
-  [ 2.6, 0,  1.7],
+  [ 2.0, 0,  1.4],
+  [ 3.2, 0,  0.0],
+  [ 4.4, 0, -1.4],
 ];
 
 // Jakub's facing formula: rotation Y = faceDirection * π/2.
@@ -92,8 +93,8 @@ export default function FightClubArena3D({
 }: FightClubArena3DProps) {
   return (
     <Canvas shadows dpr={[1, 2]} style={{ width: "100%", height: "100%" }}>
-      {/* Near-frontal hero angle — fighters fill the stage like the reference build. */}
-      <PerspectiveCamera makeDefault fov={42} position={[0, 1.9, 7.6]} />
+      {/* Low, near-frontal hero angle — fighters fill the stage like the reference build. */}
+      <PerspectiveCamera makeDefault fov={42} position={[0, 1.6, 8.6]} />
 
       {/* Reference lighting rig from Jakub's build. */}
       <ambientLight intensity={0.6} />
@@ -124,6 +125,8 @@ export default function FightClubArena3D({
             rotation={TEAM_ROT}
             scale={1.5}
             clip={clipFor("you", i, teamHp[i] ?? 0, attacker, defender, outcome)}
+            ko={(teamHp[i] ?? 0) <= 0}
+            intro={{ fromX: -11, delayMs: i * 220 }}
           />
         ))}
         {opponent.map((f, i) => (
@@ -135,6 +138,8 @@ export default function FightClubArena3D({
             rotation={OPP_ROT}
             scale={1.5}
             clip={clipFor("them", i, oppHp[i] ?? 0, attacker, defender, outcome)}
+            ko={(oppHp[i] ?? 0) <= 0}
+            intro={{ fromX: 11, delayMs: i * 220 }}
           />
         ))}
       </Suspense>

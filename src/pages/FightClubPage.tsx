@@ -1093,9 +1093,15 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
 
     let ended = false; // bug-fix: was double-firing onBattleEnd via the nextTick chain
 
+    // Hold the first turn for the arena's opening ceremony (walk-in + bow,
+    // ~3.1s incl. the per-fighter stagger) so no hits land mid-bow.
+    let firstTick = true;
+    const CEREMONY_MS = 3300;
+
     function nextTick() {
       if (ended) return; // hard guard against the re-entrant schedule bug
-      const intervalMs = 1100 / speedRef.current;
+      const intervalMs = firstTick ? CEREMONY_MS : 1100 / speedRef.current;
+      firstTick = false;
       tickRef.current = setTimeout(() => {
         runTurn();
         if (!ended) nextTick();
