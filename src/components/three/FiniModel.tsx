@@ -2,11 +2,18 @@ import { useEffect, useMemo, useRef } from "react";
 import { Group } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
-import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, finiModelUrl } from "../../lib/finiAssets";
+import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_MOOD_IDLE_URL, finiModelUrl } from "../../lib/finiAssets";
 import { applyMoodFace } from "../../lib/finiFaceMood";
 import type { FiniLiveMood } from "../../lib/finiMood";
 
 useGLTF.preload(FINI_ANIMATIONS_URL);
+
+// Mood idle clip name for a given mood (happy uses the character's own clip).
+const MOOD_IDLE_CLIP: Partial<Record<FiniLiveMood, string>> = {
+  neutral: FINI_MOOD_IDLE_URL.neutral.clip,
+  sad: FINI_MOOD_IDLE_URL.sad.clip,
+  sick: FINI_MOOD_IDLE_URL.sick.clip,
+};
 
 type FiniModelProps = {
   tokenId: number | string;
@@ -22,6 +29,11 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
+  // Mood idle clips (converted from the original rig FBX). Loaded once and
+  // cached globally by drei; clips retarget by bone name onto any character.
+  const moodNeutral = useGLTF(FINI_MOOD_IDLE_URL.neutral.url);
+  const moodSad = useGLTF(FINI_MOOD_IDLE_URL.sad.url);
+  const moodSick = useGLTF(FINI_MOOD_IDLE_URL.sick.url);
 
   // Clone so the same token can render in several canvases at once (e.g. a
   // clan-card thumb and the big viewer) — a THREE object has one parent, so
@@ -36,15 +48,24 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
   }, [sceneClone, mood]);
 
   const mergedClips = useMemo(
-    () => [...char.animations, ...anims.animations],
-    [char.animations, anims.animations],
+    () => [
+      ...char.animations,
+      ...anims.animations,
+      ...moodNeutral.animations,
+      ...moodSad.animations,
+      ...moodSick.animations,
+    ],
+    [char.animations, anims.animations, moodNeutral.animations, moodSad.animations, moodSick.animations],
   );
 
   const { actions, names } = useAnimations(mergedClips, groupRef);
 
   useEffect(() => {
     if (!actions || names.length === 0) return;
+    // Priority: explicit clip prop (battle states) → mood idle → happy idle.
+    const moodClip = mood ? MOOD_IDLE_CLIP[mood] : undefined;
     const target = (clip && actions[clip] ? clip : null)
+      ?? (moodClip && actions[moodClip] ? moodClip : null)
       ?? (actions[FINI_IDLE_CLIP] ? FINI_IDLE_CLIP : names[0]);
     const action = actions[target];
     if (!action) return;
@@ -53,7 +74,7 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
     return () => {
       action.fadeOut(0.25);
     };
-  }, [actions, names, clip, timeScale]);
+  }, [actions, names, clip, timeScale, mood]);
 
   return (
     <group ref={groupRef} scale={scale}>
