@@ -15,6 +15,8 @@ import {
 import { getFiniRecord, winRate, type FiniRecord } from "../game/finiRecords";
 import { Fini3DPreview } from "./Fini3DPreview";
 import { FiniMedia } from "./FiniMedia";
+import { moodFromDeltaPct, MOOD_META, fmtUsd, fmtDeltaPct } from "../lib/finiMood";
+import { finiModelUrl } from "../lib/finiAssets";
 import type { FiniMood } from "./FiniAvatar";
 
 const MAX_TOKEN = 9999;
@@ -28,6 +30,11 @@ const PASSIVE_LABEL: Record<PassiveAbility, string> = {
   DIAMOND_BODY: "Diamond Body", COMPOUND: "Compound", HIGH_THROUGHPUT: "High Throughput",
   MEME_SPIKE: "Meme Spike", ORACLE: "Oracle", SWAP: "Swap", AVALANCHE: "Avalanche",
   FEE_BURN: "Fee Burn", SCALING: "Scaling", SELF_AMEND: "Self-Amend",
+};
+
+const COIN_GLYPH: Record<CoinFamily, string> = {
+  BTC: "₿", ETH: "Ξ", SOL: "◎", DOGE: "Ð", LINK: "⬡",
+  UNI: "🦄", AVAX: "▲", BNB: "◆", MATIC: "⬟", XTZ: "ꜩ",
 };
 
 function slugify(n: string) { return n.toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); }
@@ -76,6 +83,7 @@ export function ExploreSection() {
   const [dataset, setDataset] = useState<TaxonomyDataset | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [manifest, setManifest] = useState<Record<string, string[]> | null>(null);
+  const [clanTokens, setClanTokens] = useState<Record<string, string[]> | null>(null);
   const [selectedFamily, setSelectedFamily] = useState<CoinFamily>("BTC");
   const [selectedClanIdx, setSelectedClanIdx] = useState(0);
   const [page, setPage] = useState(0);
@@ -95,7 +103,8 @@ export function ExploreSection() {
     Promise.all([
       loadTaxonomy(),
       fetch(asset("/clan-finis/manifest.json")).then(r => r.json()).catch(() => null),
-    ]).then(([tax, man]) => { setDataset(tax); setManifest(man); setLoaded(true); });
+      fetch(asset("/data/clanTokens.json")).then(r => r.json()).catch(() => null),
+    ]).then(([tax, man, ct]) => { setDataset(tax); setManifest(man); setClanTokens(ct); setLoaded(true); });
   }, [loaded]);
 
   useEffect(() => {
@@ -135,7 +144,16 @@ export function ExploreSection() {
   const isSpecialClan = (selectedClan as VirtualClan)?.isSpecial;
   const isMythicalClan = (selectedClan as VirtualClan)?.isMythical;
   const clanSlug = isSpecialClan || isMythicalClan ? "special" : selectedClan ? slugify(selectedClan.clan) : "";
-  const tokens: string[] = manifest?.[clanSlug] ?? [];
+  // Full clan roster from the characters_info index (every token, 3D-browsable);
+  // the old 6-sample MP4 manifest is the fallback. Specials/Mythicals live under
+  // "unknown" in the index (their characters_info has no clan field).
+  const tokens: string[] = clanTokens?.[clanSlug]
+    ?? (clanSlug === "special" ? clanTokens?.unknown : undefined)
+    ?? manifest?.[clanSlug]
+    ?? [];
+  // MP4s only exist for the manifest samples — the viewer uses them as the
+  // load/failure fallback and the clan gif for everything else.
+  const videoTokens: string[] = manifest?.[clanSlug] ?? [];
 
   const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
@@ -258,7 +276,7 @@ export function ExploreSection() {
               <InlineFiniViewer
                 clan={selectedClan} familyLabel={FAMILY_LABEL[selectedFamily]}
                 familyCode={selectedFamily} familyColor={familyColor}
-                tokens={tokens}
+                tokens={tokens} videoTokens={videoTokens}
                 finiIdx={finiIdx} setFiniIdx={setFiniIdx}
                 timeTab={timeTab} setTimeTab={setTimeTab}
                 passiveLabel={selectedClan && !(selectedClan as VirtualClan).isSpecial && !(selectedClan as VirtualClan).isMythical
@@ -485,9 +503,9 @@ function InfoPanel({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, finiIdx, setFiniIdx, timeTab, setTimeTab, passiveLabel }: {
+function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, videoTokens, finiIdx, setFiniIdx, timeTab, setTimeTab, passiveLabel }: {
   clan: ClanEntry | VirtualClan; familyLabel: string; familyCode: CoinFamily; familyColor: string;
-  tokens: string[]; finiIdx: number; setFiniIdx: (i: number) => void;
+  tokens: string[]; videoTokens?: string[]; finiIdx: number; setFiniIdx: (i: number) => void;
   timeTab: string; setTimeTab: (t: string) => void; passiveLabel?: string;
 }) {
   const vc = clan as VirtualClan;
@@ -495,26 +513,54 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
   const clanSlug = isSpecial || isMythical ? "special" : slugify(clan.clan);
   const palette = clanPalette(clanSlug, isSpecial, isMythical);
   const token = tokens[finiIdx];
-  const videoUrl = token ? finiVideoUrl(clanSlug, token) : null;
+  // MP4 previews only exist for the original manifest samples.
+  const videoUrl = token && (videoTokens ?? []).includes(token) ? finiVideoUrl(clanSlug, token) : null;
   const videoRef = useRef<HTMLVideoElement>(null);
   const accentColor = isSpecial ? "#ffd700" : isMythical ? "#c0a0ff" : familyColor;
   const displayName = isSpecial ? "Specials" : isMythical ? "Mythicals" : clan.clan;
 
   useEffect(() => { videoRef.current?.load(); }, [videoUrl]);
 
+  // Live link to this Fini's currency (the original Finiliar mechanism):
+  // api-public.finiliar.com serves latestPrice + latestDelta over the token's
+  // Frequency window; mood follows the delta.
+  const [live, setLive] = useState<OwnedFini | null>(null);
+  useEffect(() => {
+    let on = true;
+    setLive(null);
+    if (!token) return;
+    fetchOwnedFini(Number(token)).then(f => { if (on) setLive(f); }).catch(() => {});
+    return () => { on = false; };
+  }, [token]);
+  const mood = live ? moodFromDeltaPct(live.latestDelta) : undefined;
+  const deltaUp = (live?.latestDelta ?? 0) >= 0;
+
   return (
     <div style={{ borderRadius: 24, overflow: "hidden", background: palette.bg, display: "flex", flexDirection: "column", height: 600 }}>
-      <div style={{ padding: "18px 20px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ width: 28, height: 28, borderRadius: "50%", background: familyColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>
-            {familyCode.slice(0, 2)}
+      <div style={{ padding: "18px 20px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span style={{ width: 30, height: 30, borderRadius: "50%", background: "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
+            {COIN_GLYPH[familyCode] ?? familyCode.slice(0, 1)}
           </span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#333" }}>{familyLabel}: {displayName}</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: "#222", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{familyLabel}: {displayName}</span>
         </div>
         {token && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.85)", borderRadius: 12, padding: "6px 14px" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>Fini #{token}</span>
-            {passiveLabel && <span style={{ fontSize: 11, color: "#999" }}>{passiveLabel}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, background: "rgba(255,255,255,0.92)", borderRadius: 14, padding: "8px 14px" }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#222" }}>Fini #{token}</span>
+              {live && (
+                <>
+                  <span title={mood ? MOOD_META[mood].label : undefined} style={{ fontSize: 12, fontWeight: 800, color: deltaUp ? "#16a34a" : "#dc2626" }}>
+                    {deltaUp ? "↗" : "↘"} {fmtDeltaPct(live.latestDelta)}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#444" }}>{fmtUsd(live.latestPrice)}</span>
+                </>
+              )}
+            </div>
+            <a href={finiModelUrl(token)} download={`fini-${token}.glb`} title="Download 3D model"
+              style={{ width: 34, height: 34, borderRadius: 12, background: "rgba(255,255,255,0.92)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#222", fontSize: 15, fontWeight: 800 }}>
+              ↓
+            </a>
           </div>
         )}
       </div>
@@ -532,7 +578,7 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
               <img src={asset(`/clan-art/${clanSlug}.gif`)} alt={clan.clan} style={{ height: "80%", width: "auto", objectFit: "contain" }} />
             </div>
           );
-          return token ? <Fini3DPreview tokenId={token} fallback={media} /> : media;
+          return token ? <Fini3DPreview tokenId={token} fallback={media} mood={mood} /> : media;
         })()}
       </div>
       <div style={{ padding: "12px 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)" }}>
@@ -551,7 +597,9 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
       </div>
       {tokens.length > 0 && (
         <div style={{ textAlign: "center", paddingBottom: 8, fontSize: 11, color: "rgba(0,0,0,0.35)", fontWeight: 600 }}>
-          {finiIdx + 1} / {tokens.length} shown &middot; {clan.count} in clan
+          Fini {finiIdx + 1} of {tokens.length} in clan
+          {mood && <> &middot; {MOOD_META[mood].emoji} {MOOD_META[mood].label}</>}
+          {passiveLabel && <> &middot; {passiveLabel}</>}
         </div>
       )}
     </div>

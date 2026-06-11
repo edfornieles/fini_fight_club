@@ -10,9 +10,11 @@ type FiniModelProps = {
   tokenId: number | string;
   clip?: string;
   scale?: number;
+  /** Animation playback speed — mood expression (sad Finis idle slowly). */
+  timeScale?: number;
 };
 
-export function FiniModel({ tokenId, clip, scale = 1 }: FiniModelProps) {
+export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1 }: FiniModelProps) {
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
@@ -36,10 +38,11 @@ export function FiniModel({ tokenId, clip, scale = 1 }: FiniModelProps) {
     const action = actions[target];
     if (!action) return;
     action.reset().fadeIn(0.25).play();
+    action.timeScale = timeScale;
     return () => {
       action.fadeOut(0.25);
     };
-  }, [actions, names, clip]);
+  }, [actions, names, clip, timeScale]);
 
   return (
     <group ref={groupRef} scale={scale}>
