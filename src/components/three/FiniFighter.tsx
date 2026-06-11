@@ -3,9 +3,13 @@ import { Group, Vector3, AnimationClip, Mesh, Material } from "three";
 import { useFrame } from "@react-three/fiber";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
-import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, finiModelUrl } from "../../lib/finiAssets";
+import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_EMOTE_CLIPS, finiModelUrl } from "../../lib/finiAssets";
 
 useGLTF.preload(FINI_ANIMATIONS_URL);
+// Battle emotional-state clips (entrance / doingok / doingbadly / winning /
+// victory / defeated) — bundled locally, loaded once, cached globally.
+const EMOTE_URLS = Object.values(FINI_EMOTE_CLIPS).map(e => e.url);
+EMOTE_URLS.forEach(u => useGLTF.preload(u));
 
 type Vec3 = [number, number, number];
 
@@ -55,6 +59,9 @@ export function FiniFighter({
   const innerRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
+  // Emotional-state clips (one GLB each); drei caches globally so this is a
+  // fixed set of fetches for the whole app, not per-fighter.
+  const emotes = useGLTF(EMOTE_URLS);
 
   // Clone the scene so multiple fighters get independent skeletons, and clone
   // materials so per-fighter opacity (KO fade) can't bleed into other clones
@@ -82,8 +89,8 @@ export function FiniFighter({
   }, [ko, sceneClone]);
 
   const mergedClips = useMemo<AnimationClip[]>(
-    () => [...char.animations, ...anims.animations],
-    [char.animations, anims.animations],
+    () => [...char.animations, ...anims.animations, ...emotes.flatMap(g => g.animations)],
+    [char.animations, anims.animations, emotes],
   );
 
   const { actions, names } = useAnimations(mergedClips, groupRef);

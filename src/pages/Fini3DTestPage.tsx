@@ -1,11 +1,13 @@
 import { lazy, Suspense, useState } from "react";
-import { FINI_BATTLE_CLIPS, FINI_IDLE_CLIP } from "../lib/finiAssets";
+import { FINI_BATTLE_CLIPS, FINI_IDLE_CLIP, FINI_EMOTE_CLIPS } from "../lib/finiAssets";
 import type { FiniLiveMood } from "../lib/finiMood";
 
 const FiniStage = lazy(() => import("../components/three/FiniStage"));
 
-// "" = let mood drive the idle; otherwise force a specific clip.
-const CLIPS = ["", FINI_IDLE_CLIP, ...FINI_BATTLE_CLIPS] as const;
+// "" = let mood drive the idle; otherwise force a specific clip. Emote clips
+// (the new battle-state loops) listed first for easy A/B.
+const EMOTE_CLIP_NAMES = Object.values(FINI_EMOTE_CLIPS).map(e => e.clip);
+const CLIPS = ["", FINI_IDLE_CLIP, ...EMOTE_CLIP_NAMES, ...FINI_BATTLE_CLIPS] as const;
 const MOODS: FiniLiveMood[] = ["happy", "neutral", "sad", "sick"];
 
 export function Fini3DTestPage() {
