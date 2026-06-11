@@ -207,14 +207,16 @@ export function ExploreOverlay() {
                             outlineOffset: 2, transition: "all 0.12s",
                             transform: active ? "scale(1.02)" : "scale(1)", background: "transparent",
                           }}>
-                            <div style={{ background: palette.bg, height: 100, display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden", paddingBottom: 4 }}>
+                            <div style={{ background: palette.bg, height: 100, position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden", paddingBottom: 4 }}>
                               {vc.isSpecial || vc.isMythical ? (
                                 <div style={{ fontSize: vc.isSpecial ? 32 : 28, paddingBottom: 8 }}>
                                   {vc.isSpecial ? "✦" : "★"}
                                 </div>
-                              ) : (
-                                <img src={gifUrl} alt={clan.clan} style={{ height: 80, width: "auto", objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                              )}
+                              ) : (() => {
+                                const gif = <img src={gifUrl} alt={clan.clan} style={{ height: 80, width: "auto", objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+                                const thumbToken = manifest?.[cSlug]?.[0];
+                                return thumbToken ? <Fini3DPreview tokenId={thumbToken} fallback={gif} interactive={false} /> : gif;
+                              })()}
                             </div>
                             <div style={{ background: "#fff", padding: "6px 4px 8px", textAlign: "center" }}>
                               <span style={{ fontSize: 10, fontWeight: 700, color: active ? (vc.isSpecial ? "#b8860b" : vc.isMythical ? "#7c3aed" : familyColor) : "#333", display: "block", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>

@@ -8,13 +8,20 @@ const FiniStage = lazy(() => import("./three/FiniStage"));
  * Animated 3D preview of a single Fini, sized to fill its (position: relative)
  * parent. Progressive: `fallback` (the old MP4/GIF) renders while the GLB
  * loads and stays if WebGL or the asset fails, so the panel never goes blank.
+ *
+ * `interactive: false` disables drag-to-rotate AND pointer events entirely so
+ * thumbnails inside buttons/cards don't swallow clicks.
  */
-export function Fini3DPreview({ tokenId, fallback }: { tokenId: string | number; fallback?: ReactNode }) {
+export function Fini3DPreview({ tokenId, fallback, interactive = true }: {
+  tokenId: string | number;
+  fallback?: ReactNode;
+  interactive?: boolean;
+}) {
   return (
     <ArenaErrorBoundary fallback={fallback} resetKey={tokenId}>
       <Suspense fallback={fallback ?? null}>
-        <div style={{ position: "absolute", inset: 0 }}>
-          <FiniStage tokenId={tokenId} />
+        <div style={{ position: "absolute", inset: 0, ...(interactive ? {} : { pointerEvents: "none" as const }) }}>
+          <FiniStage tokenId={tokenId} interactive={interactive} />
         </div>
       </Suspense>
     </ArenaErrorBoundary>

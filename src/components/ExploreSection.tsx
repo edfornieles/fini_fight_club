@@ -223,10 +223,14 @@ export function ExploreSection() {
                           outline: active ? `3px solid ${vc.isSpecial ? "#ffd700" : vc.isMythical ? "#c0a0ff" : familyColor}` : "3px solid transparent",
                           outlineOffset: 2, transition: "all 0.12s", transform: active ? "scale(1.02)" : "scale(1)", background: "transparent",
                         }}>
-                          <div style={{ background: pal.bg, height: 100, display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden", paddingBottom: 4 }}>
+                          <div style={{ background: pal.bg, height: 100, position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden", paddingBottom: 4 }}>
                             {vc.isSpecial || vc.isMythical
                               ? <div style={{ fontSize: 32, paddingBottom: 8 }}>{vc.isSpecial ? "S" : "M"}</div>
-                              : <img src={clanGifUrl(clan.clan)} alt={clan.clan} style={{ height: 80, width: "auto", objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                              : (() => {
+                                  const gif = <img src={clanGifUrl(clan.clan)} alt={clan.clan} style={{ height: 80, width: "auto", objectFit: "contain" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+                                  const thumbToken = manifest?.[cSlug]?.[0];
+                                  return thumbToken ? <Fini3DPreview tokenId={thumbToken} fallback={gif} interactive={false} /> : gif;
+                                })()
                             }
                           </div>
                           <div style={{ background: "#fff", padding: "6px 4px 8px", textAlign: "center" }}>
