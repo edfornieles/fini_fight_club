@@ -12,6 +12,7 @@ import CLAN_COLORS from "../clanColors.json";
 import { Fini3DPreview } from "./Fini3DPreview";
 import { fetchOwnedFini, type OwnedFini } from "../game/wallet";
 import { moodFromDeltaPct, MOOD_META, fmtUsd, fmtDeltaPct } from "../lib/finiMood";
+import { useFamilyDeltas, type TimeWindow } from "../lib/familyDeltas";
 import { finiModelUrl } from "../lib/finiAssets";
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
@@ -365,8 +366,14 @@ function FiniViewer({
     fetchOwnedFini(Number(token)).then(f => { if (on) setLive(f); }).catch(() => {});
     return () => { on = false; };
   }, [token]);
-  const mood = live ? moodFromDeltaPct(live.latestDelta) : undefined;
-  const deltaUp = (live?.latestDelta ?? 0) >= 0;
+  // The selected time tab drives the displayed % shift AND the Fini's mood;
+  // falls back to the metadata API's frequency-window delta until loaded.
+  const fam = useFamilyDeltas();
+  const tabDelta = fam?.[familyCode]?.[timeTab as TimeWindow];
+  const displayDelta = (typeof tabDelta === "number" ? tabDelta : undefined) ?? live?.latestDelta;
+  const displayPrice = fam?.[familyCode]?.price ?? live?.latestPrice;
+  const mood = displayDelta != null ? moodFromDeltaPct(displayDelta) : undefined;
+  const deltaUp = (displayDelta ?? 0) >= 0;
 
   const prev = () => setFiniIdx(Math.max(0, finiIdx - 1));
   const next = () => setFiniIdx(Math.min(tokens.length - 1, finiIdx + 1));
@@ -394,13 +401,13 @@ function FiniViewer({
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, background: "rgba(255,255,255,0.92)", borderRadius: 14, padding: "8px 14px" }}>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#222" }}>Fini #{token}</span>
-              {live && (
-                <>
-                  <span title={mood ? MOOD_META[mood].label : undefined} style={{ fontSize: 12, fontWeight: 800, color: deltaUp ? "#16a34a" : "#dc2626" }}>
-                    {deltaUp ? "↗" : "↘"} {fmtDeltaPct(live.latestDelta)}
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#444" }}>{fmtUsd(live.latestPrice)}</span>
-                </>
+              {displayDelta != null && (
+                <span title={`${timeTab} change${mood ? ` · ${MOOD_META[mood].label}` : ""}`} style={{ fontSize: 12, fontWeight: 800, color: deltaUp ? "#16a34a" : "#dc2626" }}>
+                  {deltaUp ? "↗" : "↘"} {fmtDeltaPct(displayDelta)}
+                </span>
+              )}
+              {displayPrice != null && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#444" }}>{fmtUsd(displayPrice)}</span>
               )}
             </div>
             <a href={finiModelUrl(token)} download={`fini-${token}.glb`} title="Download 3D model"
