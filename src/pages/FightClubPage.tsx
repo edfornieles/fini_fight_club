@@ -14,6 +14,8 @@ import { useInventory, POTIONS, type PotionId } from "../state/inventory";
 import { useTicker } from "../hooks/useTicker";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { pickGhostOpponent, shortenWallet, synthFini, loadGhostTeams } from "../game/ghostOpponents";
+import { myTeamName, saveMyTeamName, generatedTeamName } from "../lib/teamNames";
+import { Fini3DPreview } from "../components/Fini3DPreview";
 import { useTreasury } from "../state/treasuryStore";
 import { FAMILY_ROLE, ROLE_META, ITEM_SYNERGY, SYNERGY_BONUS_MULTIPLIER, hasSynergy, familyDamageMultiplier, type FamilyRole } from "../game/familyRoles";
 
@@ -406,11 +408,14 @@ export function FightClubPage() {
           onFindOpponent={findOpponent}
           onReroll={rerollShop}
           onStartBattle={startBattle}
+          walletAddress={walletAddress}
         />
       )}
       {view === "battle" && (
         <BattleView
           team={team} opponent={opponent} opponentName={opponentName}
+          myTeamLabel={myTeamName(walletAddress)}
+          oppTeamLabel={generatedTeamName(opponentName || "ghost")}
           onBattleEnd={onBattleEnd}
         />
       )}
@@ -475,11 +480,12 @@ function RunStatusModal({ balance, onRestart }: { balance: number; onRestart: ()
 // ── Workshop ──────────────────────────────────────────────────────────────────
 
 function WorkshopView({
-  team, bench, collection, shop, opponent, opponentName, stake,
+  team, bench, collection, shop, opponent, opponentName, stake, walletAddress,
   onSwap, onSendToBench, onReturnToCollection, onEquip, onFindOpponent, onReroll, onStartBattle,
 }: {
   team: Fini[]; bench: Fini[]; collection: Fini[]; shop: Item[];
   opponent: Fini[]; opponentName: string; stake: number;
+  walletAddress?: string | null;
   onSwap: (t: number, b: number) => void;
   onSendToBench: (collectionIdx: number, benchIdx: number) => void;
   onReturnToCollection: (benchIdx: number) => void;
@@ -630,6 +636,7 @@ function WorkshopView({
                 <FiniBattleCard
                   key={i}
                   fini={f}
+                  media3d
                   position={`Enemy ${i + 1}`}
                   onClick={() => { /* opponent cards are read-only */ }}
                   highlighted={false}
@@ -645,12 +652,14 @@ function WorkshopView({
           title="Starting Lineup"
           subtitle={selectedItem !== null ? "Pick a Fini to equip" : "Click a slot to view, equip, or swap"}
           accent="#22c55e"
+          headerExtra={<TeamNameEditor wallet={walletAddress} />}
         >
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
             {team.map((f, i) => (
               <FiniBattleCard
                 key={i}
                 fini={f}
+                media3d
                 position={`Starter ${i + 1}`}
                 onClick={() => {
                   if (selectedPotion !== null) {
@@ -881,6 +890,7 @@ function WorkshopView({
                     )}
                     <FiniBattleCard
                       fini={f}
+                      media3d
                       position={`Bench ${i + 1}`}
                       onClick={() => {
                         if (selectedPotion !== null) {
@@ -1038,7 +1048,8 @@ function WorkshopView({
 
 // ── Battle view ───────────────────────────────────────────────────────────────
 
-function BattleView({ team, opponent, opponentName, onBattleEnd }: {
+function BattleView({ team, opponent, opponentName, myTeamLabel, oppTeamLabel, onBattleEnd }: {
+  myTeamLabel: string; oppTeamLabel: string;
   team: Fini[]; opponent: Fini[]; opponentName: string;
   onBattleEnd: (result: "you" | "them" | "draw") => void;
 }) {
@@ -1057,7 +1068,9 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
   const speedRef = useRef(speed);
   speedRef.current = speed;
   const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const battleRef = useRef({ teamHp: team.map(f => f.hp), oppHp: opponent.map(f => f.hp), turn: 0 });
+  // youFirst: initiative coin flip. "You" always attacking first was a ~74%
+  // built-in win rate at equal power (Monte-Carlo, scripts/simBattles.ts).
+  const battleRef = useRef({ teamHp: team.map(f => f.hp), oppHp: opponent.map(f => f.hp), turn: 0, youFirst: Math.random() < 0.5 });
 
   // background color per model token id, fetched from characters_info/<id>.json
   const [bgByToken, setBgByToken] = useState<Record<number, string>>({});
@@ -1088,8 +1101,8 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
   }, [team, opponent]);
 
   useEffect(() => {
-    // Opening narration
-    setLog([{ side: "system", msg: `⚔️ Battle begins — ${team.length}v${opponent.length}`, details: `You vs ${opponentName}`, key: Date.now() }]);
+    // Opening narration + who won the initiative roll
+    setLog([{ side: "system", msg: `⚔️ Battle begins — ${team.length}v${opponent.length}`, details: `${myTeamLabel} vs ${oppTeamLabel} · ⚡ ${battleRef.current.youFirst ? myTeamLabel : oppTeamLabel} takes the initiative`, key: Date.now() }]);
 
     let ended = false; // bug-fix: was double-firing onBattleEnd via the nextTick chain
 
@@ -1126,7 +1139,7 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
         return;
       }
 
-      const attackerSide: "you" | "them" = turn % 2 === 0 ? "you" : "them";
+      const attackerSide: "you" | "them" = (turn % 2 === 0) === battleRef.current.youFirst ? "you" : "them";
       const attackerArr = attackerSide === "you" ? team : opponent;
       const defenderArr = attackerSide === "you" ? opponent : team;
       const aliveAttackers  = attackerArr.map((f, i) => ({ f, i, hp: (attackerSide === "you" ? th : oh)[i] })).filter(x => x.hp > 0);
@@ -1202,7 +1215,8 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           <div style={{ width: 120 }} />
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: "#be185d", textTransform: "uppercase", letterSpacing: "0.08em" }}>Round {round}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: "#111", marginTop: 4 }}>You vs {opponentName}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#111", marginTop: 4 }}>{myTeamLabel} vs {oppTeamLabel}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#999", marginTop: 2 }}>you vs {opponentName}</div>
           </div>
           {/* Speed control — watch the battle 1×, 2×, or 4× speed */}
           <div style={{ display: "flex", gap: 4, background: "#fff", borderRadius: 100, padding: 4, border: "1.5px solid #f0e0ea" }}>
@@ -1262,7 +1276,7 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
         }>
           <HpStrip
             finis={opponent} hpArr={oppHp}
-            label={`${opponentName}'s team`}
+            label={`${oppTeamLabel} (${opponentName})`}
             tokenOf={modelTokenIdOf}
             attackingIdx={attacker?.side === "them" ? attacker.idx : null}
           />
@@ -1281,7 +1295,7 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           </div>
           <HpStrip
             finis={team} hpArr={teamHp}
-            label="Your team"
+            label={myTeamLabel}
             tokenOf={f => f.id}
             attackingIdx={attacker?.side === "you" ? attacker.idx : null}
           />
@@ -1557,10 +1571,38 @@ function Card({ title, subtitle, accent, headerExtra, children }: {
   );
 }
 
-function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap, onSwap }: {
+/** Inline editor for the player's squad name — shown to opponents in battle. */
+function TeamNameEditor({ wallet }: { wallet?: string | null }) {
+  const [name, setName] = useState(() => myTeamName(wallet));
+  useEffect(() => { setName(myTeamName(wallet)); }, [wallet]);
+  if (!wallet) return null;
+  return (
+    <label title="Your team name — shown to opponents in battle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>Team name</span>
+      <input
+        value={name}
+        maxLength={28}
+        onChange={e => setName(e.target.value)}
+        onBlur={() => { saveMyTeamName(wallet, name); setName(myTeamName(wallet)); }}
+        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        style={{
+          fontSize: 13, fontWeight: 800, color: "#111", fontFamily: "inherit",
+          border: "1.5px solid #e5e7eb", borderRadius: 10, padding: "5px 10px",
+          background: "#fff", width: 170, outline: "none",
+        }}
+      />
+      <span style={{ fontSize: 12 }}>✏️</span>
+    </label>
+  );
+}
+
+function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap, onSwap, media3d }: {
   fini: Fini; position: string;
   onClick: () => void; highlighted: boolean; active: boolean;
   showSwap?: boolean; onSwap?: () => void;
+  /** Render the live 3D model instead of the clan gif (capped usages only —
+   *  every instance is a WebGL canvas, so never enable for big grids). */
+  media3d?: boolean;
 }) {
   useTicker(1000); // re-render every second so countdown updates live
   const record = useFiniRecords(s => s.records[fini.id]);
@@ -1592,7 +1634,13 @@ function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap
         </div>
       )}
       <div style={{ background: CLAN_TINTS[fini.clan] ?? "#ddd", height: 120, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 90, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        {(() => {
+          const gif = <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 90, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+          // Resting Finis keep the grayscale gif — the nap should look like one.
+          return media3d && !isResting
+            ? <Fini3DPreview tokenId={modelTokenIdOf(fini)} fallback={gif} interactive={false} />
+            : gif;
+        })()}
         {fini.item && (
           <div title={fini.item.name + " — " + fini.item.effect} style={{
             position: "absolute", top: 8, right: 8,

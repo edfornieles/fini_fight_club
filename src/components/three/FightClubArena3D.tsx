@@ -1,7 +1,8 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { FiniFighter } from "./FiniFighter";
+import { CombatFX, type FxEvent } from "./CombatFX";
 import { FINI_IDLE_CLIP, FINI_STATE_CLIPS } from "../../lib/finiAssets";
 
 export type Side = "you" | "them";
@@ -19,19 +20,18 @@ type FightClubArena3DProps = {
 
 type Vec3 = [number, number, number];
 
-// Per-team slots in a receding diagonal line (the reference-build stance from
-// battles.pixelsolve.net): teammates spread evenly across the screen, the
-// closest fighter nearest the center gap, none overlapping from the frontal
-// camera.
+// Per-team slots in a reversed fan (front fighter on the OUTSIDE, line
+// receding inward toward the center gap) with generous spacing, so all six
+// fighters read separately from the frontal camera — none occlude a teammate.
 const TEAM_POS: Vec3[] = [
-  [-2.0, 0,  1.4],
-  [-3.2, 0,  0.0],
-  [-4.4, 0, -1.4],
+  [-5.6, 0,  2.0],
+  [-3.9, 0,  0.0],
+  [-2.2, 0, -2.0],
 ];
 const OPP_POS: Vec3[] = [
-  [ 2.0, 0,  1.4],
-  [ 3.2, 0,  0.0],
-  [ 4.4, 0, -1.4],
+  [ 5.6, 0,  2.0],
+  [ 3.9, 0,  0.0],
+  [ 2.2, 0, -2.0],
 ];
 
 // Jakub's facing formula: rotation Y = faceDirection * π/2.
@@ -91,10 +91,46 @@ export default function FightClubArena3D({
   defender,
   outcome = null,
 }: FightClubArena3DProps) {
+  // ── Floating combat text, driven by HP deltas (covers damage AND heals,
+  //    including future in-battle item/heal mechanics automatically). ──
+  const [fx, setFx] = useState<FxEvent[]>([]);
+  const prevHp = useRef<{ you: number[]; them: number[] } | null>(null);
+  const fxKey = useRef(0);
+  useEffect(() => {
+    const prev = prevHp.current;
+    prevHp.current = { you: [...teamHp], them: [...oppHp] };
+    if (!prev) return;
+    const spawned: FxEvent[] = [];
+    const scan = (side: Side, curr: number[], old: number[]) => {
+      curr.forEach((hp, i) => {
+        const before = old[i];
+        if (before === undefined || hp === before) return;
+        const pos = slotFor(side, i);
+        const head: [number, number, number] = [pos[0], 2.9, pos[2]];
+        if (hp < before) {
+          spawned.push({ key: ++fxKey.current, position: head, kind: "damage", text: `-${before - hp}` });
+          if (hp <= 0) {
+            spawned.push({ key: ++fxKey.current, position: [pos[0], 2.1, pos[2]], kind: "ko", text: "KO!" });
+          }
+        } else {
+          spawned.push({ key: ++fxKey.current, position: head, kind: "heal", text: `+${hp - before} 💚` });
+        }
+      });
+    };
+    scan("you", teamHp, prev.you);
+    scan("them", oppHp, prev.them);
+    if (!spawned.length) return;
+    setFx(f => [...f.slice(-8), ...spawned]);
+    const keys = spawned.map(s => s.key);
+    const t = setTimeout(() => setFx(f => f.filter(e => !keys.includes(e.key))), 1300);
+    return () => clearTimeout(t);
+  }, [teamHp, oppHp]);
+
   return (
     <Canvas shadows dpr={[1, 2]} style={{ width: "100%", height: "100%" }}>
-      {/* Low, near-frontal hero angle — fighters fill the stage like the reference build. */}
-      <PerspectiveCamera makeDefault fov={42} position={[0, 1.6, 8.6]} />
+      {/* Low, near-frontal hero angle — wide enough that the whole reversed
+          fan is on screen, close enough that fighters stay big. */}
+      <PerspectiveCamera makeDefault fov={42} position={[0, 2.0, 10.4]} />
 
       {/* Reference lighting rig from Jakub's build. */}
       <ambientLight intensity={0.6} />
@@ -143,6 +179,8 @@ export default function FightClubArena3D({
           />
         ))}
       </Suspense>
+
+      <CombatFX events={fx} />
 
       <OrbitControls
         makeDefault

@@ -189,15 +189,19 @@ export async function pickGhostOpponent(yourPower: number, matchBand = 0.15): Pr
     chosen = byDist[Math.floor(Math.random() * Math.min(10, byDist.length))];
   }
 
-  // Scale per-fini power so the synth roster lands near the target
-  const targetPerFini = yourPower / 3;
-  const naivePerFini = chosen.power / 3;
   // Scale ghost stats to fully match the player's actual team power (which
   // already factors XP / level / items / wins via computeTeamPower). No upper
   // cap — at high levels the ghost should be a real fight, not a soft target.
   // Lower clamp at 0.5 so a vastly-overpowered player still gets *some* match.
-  const scale = targetPerFini > 0 && naivePerFini > 0
-    ? Math.max(0.5, targetPerFini / naivePerFini)
+  //
+  // Speed-aware: synthFini scales hp/atk/def but NOT speed, so a naive power
+  // ratio left every scaled ghost a few % under target — a systematic house
+  // edge for the player. Solve for the scalable terms only.
+  const baseTrio = chosen.tokenIds.slice(0, 3).map(id => synthFini(id));
+  const speedTerm = baseTrio.reduce((s, f) => s + f.speed * 2, 0);
+  const scalable = baseTrio.reduce((s, f) => s + f.maxHp + f.atk * 3 + f.def * 2, 0);
+  const scale = scalable > 0
+    ? Math.max(0.5, (yourPower - speedTerm) / scalable)
     : 1;
 
   return {
