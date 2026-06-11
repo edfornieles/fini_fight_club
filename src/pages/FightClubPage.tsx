@@ -3,6 +3,9 @@ import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const FightClubArena3D = lazy(() => import("../components/three/FightClubArena3D"));
+import { ArenaErrorBoundary } from "../components/three/ArenaErrorBoundary";
+import { useGLTF } from "@react-three/drei";
+import { finiModelUrl, finiCharacterInfoUrl, type FiniCharacterInfo } from "../lib/finiAssets";
 import { useUIStore } from "../state/uiStore";
 import { useCoinStore } from "../state/coinStore";
 import { useCrumbStore } from "../state/crumbStore";
@@ -34,7 +37,23 @@ type Fini = {
   atk: number; def: number; speed: number;
   trait?: string;
   item?: Item;
+  // For ghost/opponent Finis whose `id` may be a synthetic/out-of-range value,
+  // the explicit token id used to resolve the 3D model + character art.
+  // Set at creation via `id % 10000`. Your own team leaves this undefined and
+  // the arena uses the real `id`.
+  modelTokenId?: number;
 };
+
+/** Stamp opponent/ghost Finis with an explicit in-range model token id. */
+function asOpponents(finis: Fini[]): Fini[] {
+  return finis.map(f => ({ ...f, modelTokenId: ((f.id % 10000) + 10000) % 10000 }));
+}
+
+/** The token id used to resolve a Fini's 3D model + character art: the explicit
+ *  `modelTokenId` for ghosts/opponents, otherwise the real `id`. */
+function modelTokenIdOf(f: Fini): number {
+  return f.modelTokenId ?? f.id;
+}
 
 type Item = {
   name: string; icon: string;
@@ -228,7 +247,7 @@ export function FightClubPage() {
       try {
         const pending = JSON.parse(pendingRaw) as { from: string; teamIds: number[]; stake: number };
         sessionStorage.removeItem("pending-challenge");
-        const opp = pending.teamIds.slice(0, 3).map(id => synthFini(id));
+        const opp = asOpponents(pending.teamIds.slice(0, 3).map(id => synthFini(id)));
         setOpponent(opp);
         setOpponentName(shortenWallet(pending.from));
         return;
@@ -242,13 +261,13 @@ export function FightClubPage() {
       s + f.maxHp + f.atk * 3 + f.def * 2 + f.speed * 2, 0);
     const yourPower = yourBattleStats;
     pickGhostOpponent(yourPower).then(ghost => {
-      setOpponent(ghost.finis);
+      setOpponent(asOpponents(ghost.finis));
       setOpponentName(shortenWallet(ghost.wallet));
     }).catch(err => {
       console.warn("[matchmaker] ghost pool unavailable, using synth fallback:", err);
       const seed = Math.floor(Math.random() * 9999);
       const targetPower = Math.round(yourPower * (0.9 + Math.random() * 0.2));
-      setOpponent(generateOpponent(seed, targetPower));
+      setOpponent(asOpponents(generateOpponent(seed, targetPower)));
       const names = ["sam_spike", "dani_eth", "0xpresley", "shl0ms", "d0unbug", "_baker_council_", "market_mage"];
       setOpponentName(names[seed % names.length]);
     });
@@ -556,7 +575,7 @@ function WorkshopView({
               }}>
                 {anyResting ? "💤 Starter resting" : "⚔️ Enter Arena"}
               </button>
-              {anyResting && (
+              {anyResting && import.meta.env.DEV && (
                 <button
                   onClick={() => team.forEach(f => restoreFully(f.id))}
                   title="Dev: clear all rest cooldowns on your starters"
@@ -1040,6 +1059,34 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
   const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const battleRef = useRef({ teamHp: team.map(f => f.hp), oppHp: opponent.map(f => f.hp), turn: 0 });
 
+  // background color per model token id, fetched from characters_info/<id>.json
+  const [bgByToken, setBgByToken] = useState<Record<number, string>>({});
+
+  // Preload all 6 fighters' models the moment the battle view mounts so they
+  // don't pop in one at a time, and fetch each fighter's character art so its
+  // HP card can be tinted with the Fini's `background` color.
+  useEffect(() => {
+    const tokenIds = [
+      ...team.map(f => modelTokenIdOf(f)),
+      ...opponent.map(f => modelTokenIdOf(f)),
+    ];
+    tokenIds.forEach(t => useGLTF.preload(finiModelUrl(t)));
+
+    let cancelled = false;
+    Promise.all(tokenIds.map(t =>
+      fetch(finiCharacterInfoUrl(t))
+        .then(r => (r.ok ? r.json() as Promise<FiniCharacterInfo> : null))
+        .then(info => ({ t, bg: info?.background }))
+        .catch(() => ({ t, bg: undefined as string | undefined })),
+    )).then(results => {
+      if (cancelled) return;
+      const map: Record<number, string> = {};
+      for (const { t, bg } of results) if (bg) map[t] = bg;
+      setBgByToken(map);
+    });
+    return () => { cancelled = true; };
+  }, [team, opponent]);
+
   useEffect(() => {
     // Opening narration
     setLog([{ side: "system", msg: `⚔️ Battle begins — ${team.length}v${opponent.length}`, details: `You vs ${opponentName}`, key: Date.now() }]);
@@ -1172,20 +1219,24 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           </div>
         </div>
 
-        {/* 3D arena — lazy-loaded; falls through to 2D cards below while loading. */}
-        <div style={{ width: "100%", height: 460, marginBottom: 20, borderRadius: 16, overflow: "hidden", background: "#fff0f6", border: "1.5px solid #f0e0ea" }}>
-          <Suspense fallback={<div style={{ padding: 16, color: "#999", fontSize: 13 }}>Loading 3D arena…</div>}>
-            <FightClubArena3D
-              team={team.map(f => ({ tokenId: ((f.id % 10000) + 10000) % 10000 }))}
-              opponent={opponent.map(f => ({ tokenId: ((f.id % 10000) + 10000) % 10000 }))}
-              teamHp={teamHp}
-              oppHp={oppHp}
-              attacker={attacker}
-              defender={defender}
-              outcome={outcome}
-            />
-          </Suspense>
-        </div>
+        {/* 3D arena — lazy-loaded; falls through to 2D cards below while loading.
+            The error boundary renders null on any throw (WebGL unavailable,
+            GLB 404) so the 2D cards below remain the fallback. */}
+        <ArenaErrorBoundary>
+          <div style={{ width: "100%", height: 460, marginBottom: 20, borderRadius: 16, overflow: "hidden", background: "#fff0f6", border: "1.5px solid #f0e0ea" }}>
+            <Suspense fallback={<div style={{ padding: 16, color: "#999", fontSize: 13 }}>Loading 3D arena…</div>}>
+              <FightClubArena3D
+                team={team.map(f => ({ tokenId: f.id }))}
+                opponent={opponent.map(f => ({ tokenId: modelTokenIdOf(f) }))}
+                teamHp={teamHp}
+                oppHp={oppHp}
+                attacker={attacker}
+                defender={defender}
+                outcome={outcome}
+              />
+            </Suspense>
+          </div>
+        </ArenaErrorBoundary>
 
         {/* Opponent battlefield */}
         <BattleSide
@@ -1194,6 +1245,7 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           side="them"
           attackingIdx={attacker?.side === "them" ? attacker.idx : null}
           defendingIdx={defender?.side === "them" ? defender.idx : null}
+          bgByToken={bgByToken}
           mirrored
         />
 
@@ -1217,6 +1269,7 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           side="you"
           attackingIdx={attacker?.side === "you" ? attacker.idx : null}
           defendingIdx={defender?.side === "you" ? defender.idx : null}
+          bgByToken={bgByToken}
         />
 
         {/* Battle log */}
@@ -1256,10 +1309,11 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
   );
 }
 
-function BattleSide({ finis, hpArr, label, side, attackingIdx, defendingIdx, mirrored }: {
+function BattleSide({ finis, hpArr, label, side, attackingIdx, defendingIdx, bgByToken, mirrored }: {
   finis: Fini[]; hpArr: number[]; label: string;
   side: "you" | "them";
   attackingIdx: number | null; defendingIdx: number | null;
+  bgByToken?: Record<number, string>;
   mirrored?: boolean;
 }) {
   return (
@@ -1274,6 +1328,7 @@ function BattleSide({ finis, hpArr, label, side, attackingIdx, defendingIdx, mir
             attacking={attackingIdx === i}
             defending={defendingIdx === i}
             ko={hpArr[i] <= 0}
+            bgColor={bgByToken?.[modelTokenIdOf(f)]}
           />
         ))}
       </div>
@@ -1281,7 +1336,7 @@ function BattleSide({ finis, hpArr, label, side, attackingIdx, defendingIdx, mir
   );
 }
 
-function BattleFiniCard({ fini, hp, maxHp, attacking, defending, ko }: { fini: Fini; hp: number; maxHp: number; attacking: boolean; defending: boolean; ko: boolean }) {
+function BattleFiniCard({ fini, hp, maxHp, attacking, defending, ko, bgColor }: { fini: Fini; hp: number; maxHp: number; attacking: boolean; defending: boolean; ko: boolean; bgColor?: string }) {
   const hpPct = (hp / maxHp) * 100;
   return (
     <div style={{
@@ -1292,7 +1347,7 @@ function BattleFiniCard({ fini, hp, maxHp, attacking, defending, ko }: { fini: F
       transition: "transform 0.3s, opacity 0.3s",
       boxShadow: attacking ? "0 8px 24px rgba(244,114,182,0.30)" : defending ? "0 0 0 3px #ef4444" : "0 1px 3px rgba(0,0,0,0.06)",
     }}>
-      <div style={{ background: CLAN_TINTS[fini.clan] ?? "#ddd", height: 100, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: bgColor ?? CLAN_TINTS[fini.clan] ?? "#ddd", height: 100, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 76, width: "auto", objectFit: "contain", filter: ko ? "grayscale(1)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
         {fini.item && (
           <div title={fini.item.name} style={{

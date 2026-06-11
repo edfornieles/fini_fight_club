@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useUIStore } from "../state/uiStore";
+import { useCoinStore } from "../state/coinStore";
+import { useMyEntries } from "../state/myEntriesStore";
 import { Link } from "react-router-dom";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { ActivityHub } from "../components/ActivityHub";
@@ -25,6 +27,11 @@ const MOCK_STATS = {
 
 export function ProfilePage() {
   const { walletAddress } = useUIStore();
+  const balance = useCoinStore(s => s.balance);
+  const entries = useMyEntries(s => s.entries);
+  // Real economy figures derived from the wallet's prediction entries.
+  const finiCoinSpent = entries.reduce((sum, e) => sum + e.stake, 0);
+  const finiCoinWon = entries.reduce((sum, e) => sum + (e.status === "won" ? (e.result?.payout ?? 0) : 0), 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
@@ -168,11 +175,11 @@ export function ProfilePage() {
           <Card title="🪙 FINI$" subtitle="Your in-game currency balance">
             <div style={{ background: "linear-gradient(135deg, #fef3c7, #fde047)", borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#854d0e", textTransform: "uppercase", letterSpacing: "0.06em" }}>Current Balance</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#111" }}>{MOCK_STATS.finiCoinBalance.toLocaleString()} <span style={{ fontSize: 18, color: "#854d0e" }}>FINI$</span></div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#111" }}>{balance.toLocaleString()} <span style={{ fontSize: 18, color: "#854d0e" }}>FINI$</span></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Stat label="Won" value={`${MOCK_STATS.finiCoinWon.toLocaleString()}`} sub="FINI$ from battles" color="#16a34a" />
-              <Stat label="Spent" value={`${MOCK_STATS.finiCoinSpent.toLocaleString()}`} sub="FINI$ on predictions" color="#dc2626" />
+              <Stat label="Won" value={`${finiCoinWon.toLocaleString()}`} sub="FINI$ from battles" color="#16a34a" />
+              <Stat label="Spent" value={`${finiCoinSpent.toLocaleString()}`} sub="FINI$ on predictions" color="#dc2626" />
             </div>
           </Card>
 

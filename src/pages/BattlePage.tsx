@@ -102,6 +102,18 @@ export function BattlePage() {
     setPredicting(true);
     setPredictResult(null);
     const amount = Math.round(Number(stake));
+    // Reject empty / zero / NaN stakes — a 0 bet was previously placeable.
+    if (!Number.isFinite(amount) || amount < 1) {
+      setPredictResult({ ok: false, error: "Enter a stake of at least 1 FINI$." });
+      setPredicting(false);
+      return;
+    }
+    // Server-cutoff parity: lock entries in the final 30s before the battle ends.
+    if (battleEndsAtMs(battle.id, battle.endsInMs) - Date.now() < 30_000) {
+      setPredictResult({ ok: false, error: "Predictions are locked in the final 30 seconds." });
+      setPredicting(false);
+      return;
+    }
     const lockedPct = selectedSide === "A" ? battle.sideA.pct : battle.sideB.pct;
     const idemKey = `predict:${battle.id}:${selectedSide}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
@@ -143,6 +155,12 @@ export function BattlePage() {
     // players don't have one, so calling it always 401s. During beta we settle
     // locally — the FINI$ debit above + this entry + the resolver are the
     // authoritative path. (The server call returns when real wallet auth ships.)
+    // Guard against a wallet-sync race: if the entries store is pointed at a
+    // different (or no) wallet, the optimistic FINI$ spend above would land but
+    // the entry would be dropped onto the wrong list. Re-point it first.
+    if (walletAddress && useMyEntries.getState().activeWallet !== walletAddress.toLowerCase()) {
+      useMyEntries.getState().useWallet(walletAddress);
+    }
     persistEntry(selectedSide, amount);
     setPredictResult({ ok: true, side: selectedSide, stake: amount });
     setPredicting(false);

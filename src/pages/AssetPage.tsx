@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { BattleCard } from "../components/BattleCard";
-import { getBattlesByAsset, ASSET_META } from "../data/mockBattles";
+import { ASSET_META } from "../data/mockBattles";
 import type { BattleType } from "../data/mockBattles";
+import { useSimBattles } from "../data/cryptoSim";
 import { useLivePrices, fmtPrice, fmtChange } from "../hooks/useLivePrices";
 
 const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
@@ -16,7 +17,7 @@ const TYPE_FILTERS: { label: string; value: BattleType | "all" }[] = [
   { label: "Clan War", value: "clanwar" },
 ];
 
-const TIME_FILTERS = ["All", "5 Min", "15 Min", "1 Hour", "4 Hours", "Daily", "Weekly"];
+const TIME_FILTERS = ["All", "15m", "1h", "2h", "24h"];
 
 export function AssetPage() {
   const { asset = "btc" } = useParams<{ asset: string }>();
@@ -25,6 +26,8 @@ export function AssetPage() {
   const [type, setType] = useState<BattleType | "all">("all");
   const [time, setTime] = useState("All");
   const { prices, loading, error, lastUpdated } = useLivePrices();
+  // Hook must run before any early return so the hook count stays stable (#310).
+  const allBattles = useSimBattles();
 
   if (!meta) {
     return (
@@ -36,7 +39,12 @@ export function AssetPage() {
   }
 
   const price = prices[sym];
-  const battles = getBattlesByAsset(sym).filter(b => type === "all" || b.type === type);
+  // Live sim battles for this asset (was the frozen getBattlesByAsset seed), then
+  // narrowed by the type tab and the real duration-based time chips.
+  const battles = allBattles.filter(b =>
+    b.assets.includes(sym) &&
+    (type === "all" || b.type === type) &&
+    (time === "All" || b.durationLabel === time));
   const liveBattles = battles.filter(b => b.status === "live");
   const totalVol = battles.reduce((sum, b) => sum + b.volumeK, 0);
 

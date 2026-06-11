@@ -73,6 +73,16 @@ export function PlayerProfilePage() {
     );
   }
 
+  // Roster still loading — don't flash "Holds 0 Finis" before the snapshot arrives.
+  if (roster === null) {
+    return (
+      <div style={{ ...S, padding: "80px 48px", textAlign: "center", background: "#f8f9fa", minHeight: "100vh" }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#666" }}>Loading {short}'s roster…</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 24px" }}>

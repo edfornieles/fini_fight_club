@@ -1,6 +1,8 @@
 const BASE = ((import.meta.env.VITE_FINI_ASSETS_URL as string | undefined) ??
   "https://pub-af40a5ba16d9438ab2141f56ff0bbcfe.r2.dev/raw/temp_fini_upload").replace(/\/$/, "");
 export const finiModelUrl = (t: number | string) => `${BASE}/characters/${t}.glb`;
+export const finiCharacterInfoUrl = (t: number | string) => `${BASE}/characters_info/${t}.json`;
+export type FiniCharacterInfo = { family?: string; frequency?: string; clan?: string; background?: string };
 export const FINI_ANIMATIONS_URL = `${BASE}/animations/all_animations-opt.glb`;
 export const FINI_IDLE_CLIP = "fin_happy_idle";
 // Battle-state → clip map (from the working reference build battles.pixelsolve.net):

@@ -72,8 +72,22 @@ export function FiniProfilePage() {
   const isResting = useFiniRecords(s => s.isResting(tokenId));
   const restMs    = useFiniRecords(s => s.restingMsLeft(tokenId));
 
+  // Invalid tokenId (e.g. /fini/abc → NaN) — bail with a friendly not-found.
+  // CRITICAL: this return is AFTER every hook above; moving it earlier would
+  // change the hook count between renders and reintroduce React error #310.
+  if (!Number.isInteger(tokenId) || tokenId <= 0) {
+    return (
+      <div style={{ ...S, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "#f8f9fa" }}>
+        <div style={{ fontSize: 48 }}>🔍</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#111" }}>Fini not found</div>
+        <div style={{ fontSize: 14, color: "#888" }}>That token ID isn't valid.</div>
+        <Link to="/" style={{ marginTop: 8, fontSize: 14, color: "#f472b6", fontWeight: 700, textDecoration: "none" }}>← Back home</Link>
+      </div>
+    );
+  }
+
   const meta = MOCK_METADATA[tokenId] ?? { family: "ETH", clan: "Artists", mintedAt: "2024-01-01" };
-  const family = FAMILY_INFO[meta.family];
+  const family = FAMILY_INFO[meta.family] ?? FAMILY_INFO.ETH ?? { name: meta.family, color: "#888", emoji: "🪙" };
   const clanTint = CLAN_TINTS[meta.clan] ?? "#d4d4d4";
   const power = computeFiniPower(record);
   const tier = tierFor(power);

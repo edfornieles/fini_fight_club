@@ -62,8 +62,12 @@ const CLAN_TINTS: Record<string, string> = {
 };
 
 export function LeaderboardPage() {
-  const { prices } = useLivePrices();
+  const { prices, loading: pricesLoading } = useLivePrices();
   const [arenaLadder, setArenaLadder] = useState<"profit" | "volume">("profit");
+
+  // Don't crown a $0.0000 "champion" before prices arrive (or when every
+  // provider fails) — Section 3 shows a status panel instead.
+  const pricesReady = Object.keys(prices).length > 0;
 
   // Two ladders, Polymarket-style: rank by profit (being right) OR by volume
   // (being active). Volume derived from prediction count × avg stake.
@@ -102,7 +106,7 @@ export function LeaderboardPage() {
           number={1}
           icon="🎯"
           title="Crypto Arena Champions"
-          subtitle={arenaLadder === "profit" ? "Ranked by net FINI$ won — being right pays" : "Ranked by total FINI$ staked — the most active traders"}
+          subtitle={(arenaLadder === "profit" ? "Ranked by net FINI$ won — being right pays" : "Ranked by total FINI$ staked — the most active traders") + " · sample data"}
           accent="#f472b6"
         >
           {/* Profit vs Volume ladder toggle */}
@@ -131,7 +135,7 @@ export function LeaderboardPage() {
           number={2}
           icon="⚔️"
           title="Fight Club"
-          subtitle="Top auto-battler teams and the Finis dealing the most damage"
+          subtitle="Top auto-battler teams and the Finis dealing the most damage · sample data"
           accent="#a78bfa"
         >
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
@@ -156,17 +160,29 @@ export function LeaderboardPage() {
           subtitle="Live ranking by 24-hour price change — pulled from CoinGecko + Coinbase + Binance"
           accent="#22c55e"
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Champion banner — top mover */}
-            {familyRanking[0] && <FamilyChampionBanner family={familyRanking[0]} />}
+          {pricesReady ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Champion banner — top mover */}
+              {familyRanking[0] && <FamilyChampionBanner family={familyRanking[0]} />}
 
-            {/* Full ranking list */}
-            <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {familyRanking.map((f, i) => <FamilyRow key={f.sym} rank={i + 1} family={f} />)}
+              {/* Full ranking list */}
+              <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {familyRanking.map((f, i) => <FamilyRow key={f.sym} rank={i + 1} family={f} />)}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: "36px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{pricesLoading ? "⏳" : "📡"}</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#111" }}>
+                {pricesLoading ? "Loading live prices…" : "Live prices unavailable"}
+              </div>
+              <div style={{ fontSize: 12, color: "#888", marginTop: 4, fontWeight: 500 }}>
+                {pricesLoading ? "Pulling from CoinGecko, Coinbase and Binance." : "All price providers failed — the ranking will appear when one recovers."}
+              </div>
+            </div>
+          )}
         </Section>
 
       </div>

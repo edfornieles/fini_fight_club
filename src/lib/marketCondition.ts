@@ -25,10 +25,12 @@ export function currentMarketMood(): MarketMood {
   const min = Math.min(...changes);
   const spread = max - min;
 
-  if (spread > 8)  return "volatile";
-  if (spread < 3)  return "calm";
+  // Direction first: cross-asset spread is almost always >8 in crypto, so
+  // checking spread before direction made "bullish"/"bearish" unreachable.
   if (avg >= 2)    return "bullish";
   if (avg <= -2)   return "bearish";
+  if (spread > 8)  return "volatile";
+  if (spread < 3)  return "calm";
   return "neutral";
 }
 

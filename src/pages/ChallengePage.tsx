@@ -24,7 +24,10 @@ export function ChallengePage() {
 
   const from = (params.get("from") ?? "").toLowerCase();
   const teamStr = params.get("team") ?? "";
-  const stake = Number(params.get("stake") ?? "100");
+  // Clamp the URL stake to a positive integer; default 100. (?stake=abc/0/-5
+  // previously rendered "NaN FINI$".)
+  const stakeRaw = Math.floor(Number(params.get("stake") ?? "100"));
+  const stake = Number.isFinite(stakeRaw) && stakeRaw > 0 ? stakeRaw : 100;
 
   const tokenIds = useMemo(() =>
     teamStr.split(",").map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n >= 0),

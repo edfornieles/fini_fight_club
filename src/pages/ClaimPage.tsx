@@ -53,7 +53,7 @@ export function ClaimPage() {
   }, [walletAddress, step]);
 
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [, setClaimResult] = useState<{ amount: number; tokenIds: number[] } | null>(null);
+  const [claimResult, setClaimResult] = useState<{ amount: number; tokenIds: number[] } | null>(null);
 
   async function handleSign() {
     setLoading(true);
@@ -282,11 +282,11 @@ export function ClaimPage() {
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: "#111", marginBottom: 6 }}>Claim successful!</div>
                       <div style={{ fontSize: 14, color: "#666" }}>
-                        <strong style={{ color: "#f472b6" }}>{totalClaim.toLocaleString()} Fini Coin</strong> added to your balance
+                        <strong style={{ color: "#f472b6" }}>{(claimResult?.amount ?? totalClaim).toLocaleString()} Fini Coin</strong> added to your balance
                       </div>
                     </div>
                     <div style={{ background: "#f9fafb", borderRadius: 14, padding: "14px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                      <MiniStat label="Fini Coin" value={totalClaim.toLocaleString() + " FINI$"} />
+                      <MiniStat label="Fini Coin" value={(claimResult?.amount ?? totalClaim).toLocaleString() + " FINI$"} />
                       <MiniStat label="Finis counted" value={String(finiCount)} />
                       <MiniStat label="Status" value="Claimed" />
                       <MiniStat label="Daily grant" value={`${250 + finiCount * 50} FINI$/day`} />

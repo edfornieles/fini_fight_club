@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { BattleCard } from "../components/BattleCard";
 import { ASSET_META } from "../data/mockBattles";
 import type { BattleType } from "../data/mockBattles";
-import { useCryptoSim, useSimBattles, useSimFeed } from "../data/cryptoSim";
+import { useCryptoSim, useSimBattles, useSimFeed, battleEndsAtMs } from "../data/cryptoSim";
 import { useLivePrices, fmtPrice, fmtChange } from "../hooks/useLivePrices";
 import { useMyEntries, positionValue } from "../state/myEntriesStore";
 import { useCoinStore } from "../state/coinStore";
@@ -41,16 +41,23 @@ export function CryptoArenaPage() {
   // Boot the simulator once when the page mounts (idempotent).
   useEffect(() => { start(); }, [start]);
 
+  // Live remaining time per battle — drives the Live / Ending Soon tabs and the
+  // live count off the actual countdown, not the frozen seed `status`/`endsInMs`.
+  const remainingMs = (b: typeof battles[number]) => battleEndsAtMs(b.id, b.endsInMs) - Date.now();
+
   const filtered = battles.filter(b => {
     if (asset !== "All" && !b.assets.includes(asset)) return false;
     if (type !== "all" && b.type !== type) return false;
-    if (topic === "Live" && b.status !== "live") return false;
-    if (topic === "Ending Soon" && b.endsInMs > 20 * 60 * 1000) return false;
+    if (topic === "Live" && remainingMs(b) <= 0) return false;
+    if (topic === "Ending Soon") {
+      const rem = remainingMs(b);
+      if (rem <= 0 || rem > 20 * 60 * 1000) return false;
+    }
     if (topic === "High Volume" && b.volumeK < 80) return false;
     return true;
   });
 
-  const liveCount = battles.filter(b => b.status === "live").length;
+  const liveCount = battles.filter(b => remainingMs(b) > 0).length;
 
   return (
     <div style={{ fontFamily: "'Nunito', system-ui, sans-serif", background: "#f8f9fa", minHeight: "100vh" }}>

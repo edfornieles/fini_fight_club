@@ -1,7 +1,7 @@
 import { asset } from "../lib/assetUrl";
 import { useState } from "react";
 import { useUIStore } from "../state/uiStore";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { useWalletRoster } from "../hooks/useWalletRoster";
 
@@ -40,7 +40,9 @@ function slugify(s: string) {
 
 export function AccountPage() {
   const { walletAddress } = useUIStore();
+  const navigate = useNavigate();
   const { roster, loading: rosterLoading, error: rosterError } = useWalletRoster(walletAddress);
+  const [savedTeamAt, setSavedTeamAt] = useState<Date | null>(null);
 
   // Adapt OwnedFini → page-local Fini shape (display family name + clan).
   const ALL_FINIS: Fini[] = (roster ?? []).map(f => ({
@@ -153,6 +155,23 @@ export function AccountPage() {
   const teamFull = starting.every(f => f !== null);
   const benchFull = bench.every(f => f !== null);
 
+  function saveTeam() {
+    const payload = {
+      wallet: walletAddress,
+      name: teamName,
+      startingIds: starting.filter((f): f is Fini => !!f).map(f => f.tokenId),
+      benchIds: bench.filter((f): f is Fini => !!f).map(f => f.tokenId),
+      savedAt: Date.now(),
+    };
+    localStorage.setItem("fini.account.team.v1", JSON.stringify(payload));
+    setSavedTeamAt(new Date());
+  }
+
+  function enterRanked() {
+    saveTeam();
+    navigate("/fight-club");
+  }
+
   return (
     <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
       {/* Page header */}
@@ -230,31 +249,40 @@ export function AccountPage() {
         </div>
 
         {/* CTAs */}
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <button
-            disabled={!teamFull}
-            style={{
-              background: teamFull ? "#f472b6" : "#e5e7eb",
-              color: teamFull ? "#fff" : "#aaa",
-              border: "none", borderRadius: 100,
-              padding: "13px 32px", fontSize: 15, fontWeight: 800,
-              cursor: teamFull ? "pointer" : "not-allowed",
-            }}
-          >
-            Save Team
-          </button>
-          <button
-            disabled={!teamFull}
-            style={{
-              background: teamFull ? "#fff" : "#f9fafb",
-              color: teamFull ? "#666" : "#bbb",
-              border: "1.5px solid #e5e7eb", borderRadius: 100,
-              padding: "13px 24px", fontSize: 15, fontWeight: 700,
-              cursor: teamFull ? "pointer" : "not-allowed",
-            }}
-          >
-            Enter Ranked Battle →
-          </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+            <button
+              onClick={saveTeam}
+              disabled={!teamFull}
+              style={{
+                background: teamFull ? "#f472b6" : "#e5e7eb",
+                color: teamFull ? "#fff" : "#aaa",
+                border: "none", borderRadius: 100,
+                padding: "13px 32px", fontSize: 15, fontWeight: 800,
+                cursor: teamFull ? "pointer" : "not-allowed",
+              }}
+            >
+              Save Team
+            </button>
+            <button
+              onClick={enterRanked}
+              disabled={!teamFull}
+              style={{
+                background: teamFull ? "#fff" : "#f9fafb",
+                color: teamFull ? "#666" : "#bbb",
+                border: "1.5px solid #e5e7eb", borderRadius: 100,
+                padding: "13px 24px", fontSize: 15, fontWeight: 700,
+                cursor: teamFull ? "pointer" : "not-allowed",
+              }}
+            >
+              Enter Ranked Battle →
+            </button>
+          </div>
+          {savedTeamAt && (
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#16a34a" }}>
+              ✓ Team saved {savedTeamAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </div>
+          )}
         </div>
 
         {/* Your Collection — full width below */}

@@ -44,7 +44,14 @@ type Row = {
 
 function isDev() {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem("fini_dev") !== "0";
+  // Explicit opt-in only: ?dev=1 in the URL latches dev access on; otherwise the
+  // admin dashboard requires the flag to have been set previously. (Previously
+  // this returned true for every visitor — the dashboard was effectively public.)
+  if (new URLSearchParams(window.location.search).get("dev") === "1") {
+    localStorage.setItem("fini_dev", "1");
+    return true;
+  }
+  return localStorage.getItem("fini_dev") === "1";
 }
 
 const STRATEGY_BLURB: Record<string, string> = {
