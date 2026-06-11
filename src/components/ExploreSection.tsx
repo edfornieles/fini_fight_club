@@ -13,6 +13,7 @@ import {
   SPECIAL_PERKS, MYTHICAL_PERKS,
 } from "../game/attributes";
 import { getFiniRecord, winRate, type FiniRecord } from "../game/finiRecords";
+import { Fini3DPreview } from "./Fini3DPreview";
 import { FiniMedia } from "./FiniMedia";
 import type { FiniMood } from "./FiniAvatar";
 
@@ -514,16 +515,21 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
         )}
       </div>
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        {videoUrl ? (
-          <video ref={videoRef} key={videoUrl} autoPlay loop muted playsInline
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}>
-            <source src={videoUrl} type="video/mp4" />
-          </video>
-        ) : (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <img src={asset(`/clan-art/${clanSlug}.gif`)} alt={clan.clan} style={{ height: "80%", width: "auto", objectFit: "contain" }} />
-          </div>
-        )}
+        {(() => {
+          // Old media kept as the progressive fallback: it plays while the GLB
+          // streams in and stays if WebGL/the model fails.
+          const media = videoUrl ? (
+            <video ref={videoRef} key={videoUrl} autoPlay loop muted playsInline
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}>
+              <source src={videoUrl} type="video/mp4" />
+            </video>
+          ) : (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src={asset(`/clan-art/${clanSlug}.gif`)} alt={clan.clan} style={{ height: "80%", width: "auto", objectFit: "contain" }} />
+            </div>
+          );
+          return token ? <Fini3DPreview tokenId={token} fallback={media} /> : media;
+        })()}
       </div>
       <div style={{ padding: "12px 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)" }}>
         <NavBtn dir="<" disabled={finiIdx === 0 || !tokens.length} onClick={() => setFiniIdx(Math.max(0, finiIdx - 1))} size={36} />

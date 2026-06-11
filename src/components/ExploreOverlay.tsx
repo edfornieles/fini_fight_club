@@ -9,6 +9,7 @@ import {
 } from "../game/taxonomy";
 import { FAMILY_COLOR } from "./familyColors";
 import CLAN_COLORS from "../clanColors.json";
+import { Fini3DPreview } from "./Fini3DPreview";
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
 
@@ -363,26 +364,29 @@ function FiniViewer({
         )}
       </div>
 
-      {/* ── Video / idle animation ── */}
+      {/* ── 3D model (animated GLB), falling back to video / clan gif ── */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0 }}>
-        {videoUrl ? (
-          <video
-            ref={videoRef}
-            key={videoUrl}
-            autoPlay loop muted playsInline
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
-          >
-            <source src={videoUrl} type="video/mp4" />
-          </video>
-        ) : (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <img
-              src={isSpecial || isMythical ? asset("/clan-art/special.gif") : asset(`/clan-art/${clanSlug}.gif`)}
-              alt={clan.clan}
-              style={{ height: "80%", width: "auto", objectFit: "contain" }}
-            />
-          </div>
-        )}
+        {(() => {
+          const media = videoUrl ? (
+            <video
+              ref={videoRef}
+              key={videoUrl}
+              autoPlay loop muted playsInline
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
+            >
+              <source src={videoUrl} type="video/mp4" />
+            </video>
+          ) : (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img
+                src={isSpecial || isMythical ? asset("/clan-art/special.gif") : asset(`/clan-art/${clanSlug}.gif`)}
+                alt={clan.clan}
+                style={{ height: "80%", width: "auto", objectFit: "contain" }}
+              />
+            </div>
+          );
+          return token ? <Fini3DPreview tokenId={token} fallback={media} /> : media;
+        })()}
       </div>
 
       {/* ── Bottom controls ── */}
