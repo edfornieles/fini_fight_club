@@ -1283,8 +1283,8 @@ function BattleView({ team, opponent, opponentName, myTeamLabel, oppTeamLabel, o
           <div style={{ width: "100%", height: 520, margin: "10px 0", borderRadius: 16, overflow: "hidden", background: "#fdf2f8", border: "1.5px solid #f0e0ea" }}>
             <Suspense fallback={<div style={{ padding: 16, color: "#999", fontSize: 13 }}>Loading 3D arena…</div>}>
               <FightClubArena3D
-                team={team.map(f => ({ tokenId: f.id, maxHp: f.maxHp }))}
-                opponent={opponent.map(f => ({ tokenId: modelTokenIdOf(f), maxHp: f.maxHp }))}
+                team={team.map(f => ({ tokenId: f.id }))}
+                opponent={opponent.map(f => ({ tokenId: modelTokenIdOf(f) }))}
                 teamHp={teamHp}
                 oppHp={oppHp}
                 attacker={attacker}

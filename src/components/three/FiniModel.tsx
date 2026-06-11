@@ -2,9 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Group } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
-import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_MOOD_IDLE_URL, FINI_EMOTE_CLIPS, finiModelUrl } from "../../lib/finiAssets";
-
-const EMOTE_URLS = Object.values(FINI_EMOTE_CLIPS).map(e => e.url);
+import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_MOOD_IDLE_URL, finiModelUrl } from "../../lib/finiAssets";
 import { applyMoodFace } from "../../lib/finiFaceMood";
 import type { FiniLiveMood } from "../../lib/finiMood";
 
@@ -36,9 +34,6 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
   const moodNeutral = useGLTF(FINI_MOOD_IDLE_URL.neutral.url);
   const moodSad = useGLTF(FINI_MOOD_IDLE_URL.sad.url);
   const moodSick = useGLTF(FINI_MOOD_IDLE_URL.sick.url);
-  // Battle emotional-state clips, so the test page (and any caller) can play
-  // entrance / doingok / doingbadly / winning / victory / defeated by name.
-  const emotes = useGLTF(EMOTE_URLS);
 
   // Clone so the same token can render in several canvases at once (e.g. a
   // clan-card thumb and the big viewer) — a THREE object has one parent, so
@@ -59,9 +54,8 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
       ...moodNeutral.animations,
       ...moodSad.animations,
       ...moodSick.animations,
-      ...emotes.flatMap(g => g.animations),
     ],
-    [char.animations, anims.animations, moodNeutral.animations, moodSad.animations, moodSick.animations, emotes],
+    [char.animations, anims.animations, moodNeutral.animations, moodSad.animations, moodSick.animations],
   );
 
   const { actions, names } = useAnimations(mergedClips, groupRef);

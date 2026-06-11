@@ -3,10 +3,10 @@ import { Canvas } from "@react-three/fiber";
 import { ContactShadows, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { FiniFighter } from "./FiniFighter";
 import { CombatFX, type FxEvent } from "./CombatFX";
-import { FINI_STATE_CLIPS, FINI_EMOTE_CLIPS } from "../../lib/finiAssets";
+import { FINI_IDLE_CLIP, FINI_STATE_CLIPS } from "../../lib/finiAssets";
 
 export type Side = "you" | "them";
-export type ArenaFighter = { tokenId: number | string; maxHp?: number };
+export type ArenaFighter = { tokenId: number | string };
 
 type FightClubArena3DProps = {
   team: ArenaFighter[];
@@ -68,25 +68,18 @@ function clipFor(
   side: Side,
   idx: number,
   hp: number,
-  maxHp: number,
   attacker: FightClubArena3DProps["attacker"],
   defender: FightClubArena3DProps["defender"],
   outcome: FightClubArena3DProps["outcome"],
 ): string {
-  // End of battle: real victory / defeated emotes from the original rig.
   if (outcome && outcome !== "draw") {
-    if (hp <= 0) return FINI_EMOTE_CLIPS.defeated.clip;
-    return outcome === side ? FINI_EMOTE_CLIPS.victory.clip : FINI_EMOTE_CLIPS.defeated.clip;
+    if (hp <= 0) return FINI_STATE_CLIPS.loser;
+    return outcome === side ? FINI_STATE_CLIPS.winner : FINI_STATE_CLIPS.loser;
   }
-  if (hp <= 0) return FINI_EMOTE_CLIPS.defeated.clip;
-  // Mid-attack/defend keep the punchy move clips for readability.
+  if (hp <= 0) return FINI_STATE_CLIPS.loser;
   if (attacker && attacker.side === side && attacker.idx === idx) return FINI_STATE_CLIPS.attack;
   if (defender && defender.side === side && defender.idx === idx) return FINI_STATE_CLIPS.defend;
-  // Resting state emotes the fighter's HP: hurt when low, confident when high.
-  const pct = maxHp > 0 ? hp / maxHp : 1;
-  if (pct <= 0.33) return FINI_EMOTE_CLIPS.doingbadly.clip;
-  if (pct >= 0.85) return FINI_EMOTE_CLIPS.winning.clip;
-  return FINI_EMOTE_CLIPS.doingok.clip;
+  return FINI_IDLE_CLIP;
 }
 
 export default function FightClubArena3D({
@@ -167,7 +160,7 @@ export default function FightClubArena3D({
             lungeTo={lungeTargetFor("you", i, attacker, defender)}
             rotation={TEAM_ROT}
             scale={1.5}
-            clip={clipFor("you", i, teamHp[i] ?? 0, f.maxHp ?? teamHp[i] ?? 1, attacker, defender, outcome)}
+            clip={clipFor("you", i, teamHp[i] ?? 0, attacker, defender, outcome)}
             ko={(teamHp[i] ?? 0) <= 0}
             intro={{ fromX: -11, delayMs: i * 220 }}
           />
@@ -180,7 +173,7 @@ export default function FightClubArena3D({
             lungeTo={lungeTargetFor("them", i, attacker, defender)}
             rotation={OPP_ROT}
             scale={1.5}
-            clip={clipFor("them", i, oppHp[i] ?? 0, f.maxHp ?? oppHp[i] ?? 1, attacker, defender, outcome)}
+            clip={clipFor("them", i, oppHp[i] ?? 0, attacker, defender, outcome)}
             ko={(oppHp[i] ?? 0) <= 0}
             intro={{ fromX: 11, delayMs: i * 220 }}
           />
