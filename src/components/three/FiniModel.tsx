@@ -3,6 +3,8 @@ import { Group } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, finiModelUrl } from "../../lib/finiAssets";
+import { applyMoodFace } from "../../lib/finiFaceMood";
+import type { FiniLiveMood } from "../../lib/finiMood";
 
 useGLTF.preload(FINI_ANIMATIONS_URL);
 
@@ -12,9 +14,11 @@ type FiniModelProps = {
   scale?: number;
   /** Animation playback speed — mood expression (sad Finis idle slowly). */
   timeScale?: number;
+  /** Live price mood — swaps the face texture's mouth (frown/flat/squiggle). */
+  mood?: FiniLiveMood;
 };
 
-export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1 }: FiniModelProps) {
+export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: FiniModelProps) {
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
@@ -23,6 +27,13 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1 }: FiniModel
   // clan-card thumb and the big viewer) — a THREE object has one parent, so
   // sharing char.scene directly makes the last mount steal it from the first.
   const sceneClone = useMemo(() => SkeletonUtils.clone(char.scene), [char.scene]);
+
+  // Mood face: redraw the mouth on this clone's face texture (and restore the
+  // original when the mood returns to happy). applyMoodFace clones the face
+  // material first, so the shared GLTF cache is never mutated.
+  useEffect(() => {
+    applyMoodFace(sceneClone, mood ?? "happy");
+  }, [sceneClone, mood]);
 
   const mergedClips = useMemo(
     () => [...char.animations, ...anims.animations],
