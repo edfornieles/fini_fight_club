@@ -20,16 +20,17 @@ type FightClubArena3DProps = {
 type Vec3 = [number, number, number];
 
 // Per-team slots, depth-staggered in a shallow arc so all three read distinctly
-// from the 3/4 camera once the fighters are in profile.
+// once the fighters are in profile. Tight gap + near-frontal camera = the
+// big-fighter framing of Jakub's reference build (battles.pixelsolve.net).
 const TEAM_POS: Vec3[] = [
-  [-5.0, 0, -2.2],
-  [-5.5, 0,  0.0],
-  [-5.0, 0,  2.2],
+  [-2.6, 0, -1.7],
+  [-3.1, 0,  0.0],
+  [-2.6, 0,  1.7],
 ];
 const OPP_POS: Vec3[] = [
-  [ 5.0, 0, -2.2],
-  [ 5.5, 0,  0.0],
-  [ 5.0, 0,  2.2],
+  [ 2.6, 0, -1.7],
+  [ 3.1, 0,  0.0],
+  [ 2.6, 0,  1.7],
 ];
 
 // Jakub's facing formula: rotation Y = faceDirection * π/2.
@@ -91,8 +92,8 @@ export default function FightClubArena3D({
 }: FightClubArena3DProps) {
   return (
     <Canvas shadows dpr={[1, 2]} style={{ width: "100%", height: "100%" }}>
-      {/* Zoomed-in 3/4 hero angle — fixed, no Bounds auto-frame. */}
-      <PerspectiveCamera makeDefault fov={45} position={[7, 4.5, 11]} />
+      {/* Near-frontal hero angle — fighters fill the stage like the reference build. */}
+      <PerspectiveCamera makeDefault fov={42} position={[0, 1.9, 7.6]} />
 
       {/* Reference lighting rig from Jakub's build. */}
       <ambientLight intensity={0.6} />
@@ -100,10 +101,10 @@ export default function FightClubArena3D({
       <directionalLight position={[-8, 5, -5]} intensity={0.4} />
       <pointLight position={[0, 10, 0]} intensity={0.5} />
 
-      {/* Soft floor + global contact shadow. */}
+      {/* Soft gray floor (reference-build palette) + global contact shadow. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[40, 24]} />
-        <meshStandardMaterial color="#fce8f3" />
+        <meshStandardMaterial color="#c9c2c6" />
       </mesh>
       <ContactShadows
         position={[0, 0.01, 0]}
@@ -141,8 +142,8 @@ export default function FightClubArena3D({
       <OrbitControls
         makeDefault
         enablePan={false}
-        target={[0, 1.2, 0]}
-        minDistance={6}
+        target={[0, 1.05, 0]}
+        minDistance={4}
         maxDistance={30}
       />
     </Canvas>

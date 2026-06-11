@@ -1219,11 +1219,48 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           </div>
         </div>
 
-        {/* 3D arena — lazy-loaded; falls through to 2D cards below while loading.
-            The error boundary renders null on any throw (WebGL unavailable,
-            GLB 404) so the 2D cards below remain the fallback. */}
-        <ArenaErrorBoundary>
-          <div style={{ width: "100%", height: 460, marginBottom: 20, borderRadius: 16, overflow: "hidden", background: "#fff0f6", border: "1.5px solid #f0e0ea" }}>
+        {/* Battle stage — compact HP strips docked above (opponent) and below
+            (your team) a full-width arena, per the reference design. The old
+            2D card layout is the fallback when WebGL/assets fail. */}
+        <ArenaErrorBoundary fallback={
+          <>
+            <BattleSide
+              finis={opponent} hpArr={oppHp}
+              label={`${opponentName}'s team`}
+              side="them"
+              attackingIdx={attacker?.side === "them" ? attacker.idx : null}
+              defendingIdx={defender?.side === "them" ? defender.idx : null}
+              bgByToken={bgByToken}
+              mirrored
+            />
+            <div style={{ margin: "20px 0", display: "flex", alignItems: "center", gap: 20 }}>
+              <div style={{ flex: 1, height: 1, background: "#f0f0f0" }} />
+              <div style={{
+                background: "#fff", border: "1.5px solid #f0e0ea", borderRadius: 100,
+                padding: "8px 20px", fontSize: 14, fontWeight: 900, color: "#be185d",
+                boxShadow: "0 2px 12px rgba(244,114,182,0.10)",
+              }}>
+                ⚔️ VS
+              </div>
+              <div style={{ flex: 1, height: 1, background: "#f0f0f0" }} />
+            </div>
+            <BattleSide
+              finis={team} hpArr={teamHp}
+              label="Your team"
+              side="you"
+              attackingIdx={attacker?.side === "you" ? attacker.idx : null}
+              defendingIdx={defender?.side === "you" ? defender.idx : null}
+              bgByToken={bgByToken}
+            />
+          </>
+        }>
+          <HpStrip
+            finis={opponent} hpArr={oppHp}
+            label={`${opponentName}'s team`}
+            tokenOf={modelTokenIdOf}
+            attackingIdx={attacker?.side === "them" ? attacker.idx : null}
+          />
+          <div style={{ width: "100%", height: 520, margin: "10px 0", borderRadius: 16, overflow: "hidden", background: "#fdf2f8", border: "1.5px solid #f0e0ea" }}>
             <Suspense fallback={<div style={{ padding: 16, color: "#999", fontSize: 13 }}>Loading 3D arena…</div>}>
               <FightClubArena3D
                 team={team.map(f => ({ tokenId: f.id }))}
@@ -1236,41 +1273,13 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
               />
             </Suspense>
           </div>
+          <HpStrip
+            finis={team} hpArr={teamHp}
+            label="Your team"
+            tokenOf={f => f.id}
+            attackingIdx={attacker?.side === "you" ? attacker.idx : null}
+          />
         </ArenaErrorBoundary>
-
-        {/* Opponent battlefield */}
-        <BattleSide
-          finis={opponent} hpArr={oppHp}
-          label={`${opponentName}'s team`}
-          side="them"
-          attackingIdx={attacker?.side === "them" ? attacker.idx : null}
-          defendingIdx={defender?.side === "them" ? defender.idx : null}
-          bgByToken={bgByToken}
-          mirrored
-        />
-
-        {/* VS divider with battle log */}
-        <div style={{ margin: "20px 0", display: "flex", alignItems: "center", gap: 20 }}>
-          <div style={{ flex: 1, height: 1, background: "#f0f0f0" }} />
-          <div style={{
-            background: "#fff", border: "1.5px solid #f0e0ea", borderRadius: 100,
-            padding: "8px 20px", fontSize: 14, fontWeight: 900, color: "#be185d",
-            boxShadow: "0 2px 12px rgba(244,114,182,0.10)",
-          }}>
-            ⚔️ VS
-          </div>
-          <div style={{ flex: 1, height: 1, background: "#f0f0f0" }} />
-        </div>
-
-        {/* Your battlefield */}
-        <BattleSide
-          finis={team} hpArr={teamHp}
-          label="Your team"
-          side="you"
-          attackingIdx={attacker?.side === "you" ? attacker.idx : null}
-          defendingIdx={defender?.side === "you" ? defender.idx : null}
-          bgByToken={bgByToken}
-        />
 
         {/* Battle log */}
         <div style={{ marginTop: 24, background: "#fff", borderRadius: 16, border: "1.5px solid #f0f0f0", padding: "16px 20px", maxHeight: 300, overflow: "auto" }}>
@@ -1305,6 +1314,48 @@ function BattleView({ team, opponent, opponentName, onBattleEnd }: {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Compact per-fighter HP bars docked to the arena edge (reference design):
+ *  "#7488  [████____]  45 / 53" with a family chip, three across. */
+function HpStrip({ finis, hpArr, label, tokenOf, attackingIdx }: {
+  finis: Fini[]; hpArr: number[]; label: string;
+  tokenOf: (f: Fini) => number;
+  attackingIdx: number | null;
+}) {
+  return (
+    <div title={label} style={{
+      display: "grid", gridTemplateColumns: `repeat(${Math.max(finis.length, 1)}, 1fr)`, gap: 28,
+      background: "#fff", borderRadius: 14, border: "1.5px solid #f0e0ea",
+      padding: "12px 20px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+    }}>
+      {finis.map((f, i) => {
+        const hp = Math.max(0, hpArr[i] ?? 0);
+        const pct = Math.min(100, (hp / f.maxHp) * 100);
+        const barColor = pct > 50 ? "#22c55e" : pct > 25 ? "#f59e0b" : "#ef4444";
+        const ko = hp <= 0;
+        const attacking = attackingIdx === i;
+        return (
+          <div key={f.id} style={{ opacity: ko ? 0.4 : 1, transition: "opacity 0.3s" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#111" }}>
+                {attacking && "⚔️ "}#{tokenOf(f)}
+              </span>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 7px", borderRadius: 100, background: (FAMILY_COLOR[f.family] ?? "#888") + "1e", color: FAMILY_COLOR[f.family] ?? "#666" }}>
+                {f.family}
+              </span>
+            </div>
+            <div style={{ height: 6, borderRadius: 100, background: "#eef0f2", overflow: "hidden", marginTop: 7 }}>
+              <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 100, transition: "width 0.45s, background 0.45s" }} />
+            </div>
+            <div style={{ textAlign: "right", fontSize: 10, color: "#9aa0a6", marginTop: 4, fontWeight: 600 }}>
+              {hp} / {f.maxHp}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
