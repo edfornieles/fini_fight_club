@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Bounds, Center, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { FiniModel } from "./FiniModel";
 
 type FiniStageProps = {
@@ -10,27 +10,26 @@ type FiniStageProps = {
   interactive?: boolean;
 };
 
+// Finis share one rig: origin at the feet, ~1.6–2 units tall. Fixed framing
+// (same approach as FightClubArena3D) beats auto-fit here — skinned-mesh
+// bounds report the bind pose, which made Bounds zoom onto heads.
+const LOOK_AT: [number, number, number] = [0, 0.85, 0];
+
 export default function FiniStage({ tokenId, clip, interactive = true }: FiniStageProps) {
   return (
     <Canvas
-      camera={{ fov: 40, position: [0, 0.6, 3.4] }}
+      camera={{ fov: 40, position: [0, 1.0, 4.2] }}
       dpr={[1, 1.5]}
       style={{ width: "100%", height: "100%" }}
+      onCreated={({ camera }) => camera.lookAt(...LOOK_AT)}
     >
       <ambientLight intensity={0.7} />
       <directionalLight position={[3, 5, 4]} intensity={1.1} />
       <directionalLight position={[-4, 2, -3]} intensity={0.6} />
       <Suspense fallback={null}>
-        {/* Auto-fit the camera to whatever model loads — token heights vary,
-            so a fixed camera/target crops some Finis (cut off at the chest).
-            key remounts Bounds per token so each new model re-frames. */}
-        <Bounds key={String(tokenId)} fit clip observe margin={1.15}>
-          <Center>
-            <FiniModel tokenId={tokenId} clip={clip} />
-          </Center>
-        </Bounds>
+        <FiniModel tokenId={tokenId} clip={clip} />
       </Suspense>
-      {interactive && <OrbitControls makeDefault enablePan={false} enableZoom={false} />}
+      {interactive && <OrbitControls makeDefault enablePan={false} enableZoom={false} target={LOOK_AT} />}
     </Canvas>
   );
 }

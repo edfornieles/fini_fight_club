@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Group } from "three";
+import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, finiModelUrl } from "../../lib/finiAssets";
 
@@ -15,6 +16,11 @@ export function FiniModel({ tokenId, clip, scale = 1 }: FiniModelProps) {
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
+
+  // Clone so the same token can render in several canvases at once (e.g. a
+  // clan-card thumb and the big viewer) — a THREE object has one parent, so
+  // sharing char.scene directly makes the last mount steal it from the first.
+  const sceneClone = useMemo(() => SkeletonUtils.clone(char.scene), [char.scene]);
 
   const mergedClips = useMemo(
     () => [...char.animations, ...anims.animations],
@@ -37,7 +43,7 @@ export function FiniModel({ tokenId, clip, scale = 1 }: FiniModelProps) {
 
   return (
     <group ref={groupRef} scale={scale}>
-      <primitive object={char.scene} />
+      <primitive object={sceneClone} />
     </group>
   );
 }
