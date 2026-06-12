@@ -11,22 +11,26 @@ const AnimLabStage = lazy(() => import("../components/three/AnimLabStage"));
 // also gets a sad mouth).
 const GROUPS: { mood: string; face: FiniLiveMood; clips: { label: string; clip: string }[] }[] = [
   { mood: "😀 Happy / great", face: "happy", clips: [
+    { label: "happy workout", clip: "fin_happy_workout" },
     { label: "dance", clip: "fin_dance" },
     { label: "dancing w/ stars", clip: "fin_dancingwithstars" },
     { label: "huge surprise", clip: "fin_hugesurprise" },
   ]},
   { mood: "😐 Neutral", face: "neutral", clips: [
+    { label: "neutral workout", clip: "fin_neutral_workout" },
     { label: "neutral idle", clip: "fin_neutral_idle" },
     { label: "bored", clip: "fin_bored" },
     { label: "hungry stomach", clip: "fin_hungrystomach" },
   ]},
   { mood: "🙁 Sad", face: "sad", clips: [
+    { label: "sad workout", clip: "fin_sad_workout" },
     { label: "mope", clip: "fin_mope" },
     { label: "angry", clip: "fin_angry" },
     { label: "cough", clip: "fin_cough" },
     { label: "distress sway", clip: "fin_distresssway" },
   ]},
   { mood: "🤢 Very sad / dying", face: "sick", clips: [
+    { label: "supersad workout", clip: "fin_supersad_workout" },
     { label: "near dead", clip: "fin_neardead" },
     { label: "rain crying", clip: "fin_raincrying" },
     { label: "rain desperate", clip: "fin_raindesperate" },

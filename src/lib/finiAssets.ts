@@ -35,18 +35,21 @@ export const MOOD_CLIP_SETS: Record<"happy" | "neutral" | "sad" | "sick", MoodCl
 
 // Workout-themed mood: the coin's performance "over a time period" reads as a
 // training session — winning trains hard and happy, losing struggles, crashing
-// ends up on the floor. Used where performance-over-time is the focus (Explore).
+// ends up collapsed on the floor. The COMPLETE authentic set (all four moods
+// from the original workout animations, sad/supersad rescued via the
+// assimp→GLB→object-retarget pipeline in scripts/retarget_assimp.py).
 export const WORKOUT_MOOD_CLIP: Record<"happy" | "neutral" | "sad" | "sick", string> = {
   happy:   "fin_happy_workout",
   neutral: "fin_neutral_workout",
-  sad:     "fin_mope",
-  sick:    "fin_neardead",
+  sad:     "fin_sad_workout",
+  sick:    "fin_supersad_workout",
 };
 // Every clip GLB url (deduped) — FiniModel loads the whole set once (cached
 // globally by drei) so any token can play any mood clip.
-export const ALL_MOOD_CLIP_URLS: string[] = Array.from(new Set(
-  Object.values(MOOD_CLIP_SETS).flat().map(c => asset(`/anim/${c.clip}.glb`)),
-));
+export const ALL_MOOD_CLIP_URLS: string[] = Array.from(new Set([
+  ...Object.values(MOOD_CLIP_SETS).flat().map(c => asset(`/anim/${c.clip}.glb`)),
+  ...Object.values(WORKOUT_MOOD_CLIP).map(c => asset(`/anim/${c}.glb`)),
+]));
 
 // Deterministic per-token pick from a mood tier. `compact` thumbnails restrict
 // to upright clips (very-sad falls back to the upright sad set).
