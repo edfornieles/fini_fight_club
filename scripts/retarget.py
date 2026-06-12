@@ -49,26 +49,22 @@ src_name_by_char = {c.name: s.name for c, s in pairs}
 sample_name = pairs[0][0].name
 sample_first = sample_last = None
 
+for cbone, _ in pairs:
+    cbone.rotation_mode = "QUATERNION"
 for frame in range(fmin, fmax + 1):
     sc.frame_set(frame)
-    # Read the source pose from the EVALUATED object — the original object's
-    # pose.bones[].matrix does NOT reflect the animation, which is why earlier
-    # bakes captured identical (rest) poses.
     dg = bpy.context.evaluated_depsgraph_get()
     src_eval = src_arm.evaluated_get(dg)
-    mats = {cn: src_eval.pose.bones[sn].matrix.copy() for cn, sn in src_name_by_char.items()}
+    # Copy LOCAL, rest-relative pose channels bone-for-bone. These are immune
+    # to the FBX import's object axis-rotation AND unit-scale (both of which
+    # corrupted the matrix-copy approaches). Works when the two rigs share bone
+    # rest orientations — which they do, same Fin_Bone_* convention.
     for cbone, _ in pairs:
-        cbone.matrix = mats[cbone.name]
-        bpy.context.view_layer.update()  # pose parents before children
-    for cbone, _ in pairs:
-        cbone.keyframe_insert("location", frame=frame)
+        sb = src_eval.pose.bones[src_name_by_char[cbone.name]]
+        cbone.rotation_quaternion = sb.rotation_quaternion
+        cbone.location = sb.location
         cbone.keyframe_insert("rotation_quaternion", frame=frame)
-        cbone.keyframe_insert("scale", frame=frame)
-    loc = mats[sample_name].to_translation()
-    if sample_first is None: sample_first = loc.copy()
-    sample_last = loc.copy()
-
-print("SAMPLE_DELTA", sample_name, (sample_last - sample_first).length)
+        cbone.keyframe_insert("location", frame=frame)
 
 # Verify the CHAR action actually varies frame-to-frame (decompose check).
 sc.frame_set(fmin); bpy.context.view_layer.update()
