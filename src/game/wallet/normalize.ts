@@ -89,6 +89,7 @@ type RawMetadata = {
   attributes?: RawAttribute[];
   latestPrice?: number;
   latestDelta?: number;
+  priceHistory?: { date: number; price: number }[];
 };
 
 function attr(attrs: RawAttribute[] | undefined, type: string): string | undefined {
@@ -134,5 +135,8 @@ export function metadataToOwnedFini(
     artwork,
     latestPrice: typeof meta.latestPrice === "number" ? meta.latestPrice : 0,
     latestDelta: typeof meta.latestDelta === "number" ? meta.latestDelta : 0,
+    priceHistory: Array.isArray(meta.priceHistory)
+      ? meta.priceHistory.filter(p => typeof p?.price === "number")
+      : undefined,
   };
 }

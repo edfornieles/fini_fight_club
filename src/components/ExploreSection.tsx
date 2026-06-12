@@ -14,6 +14,7 @@ import {
 } from "../game/attributes";
 import { getFiniRecord, winRate, type FiniRecord } from "../game/finiRecords";
 import { Fini3DPreview } from "./Fini3DPreview";
+import { PriceSparkline } from "./PriceSparkline";
 import { FiniMedia } from "./FiniMedia";
 import { moodFromDeltaPct, MOOD_META, fmtUsd, fmtDeltaPct } from "../lib/finiMood";
 import { useFamilyDeltas, type TimeWindow } from "../lib/familyDeltas";
@@ -573,6 +574,11 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
         )}
       </div>
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        {/* Market graph backdrop — the linked coin's recent performance, behind
+            the Fini so its mood and its chart read together. */}
+        {live?.priceHistory && live.priceHistory.length > 1 && (
+          <PriceSparkline prices={live.priceHistory.map(p => p.price)} up={deltaUp} />
+        )}
         {(() => {
           // Old media kept as the progressive fallback: it plays while the GLB
           // streams in and stays if WebGL/the model fails.

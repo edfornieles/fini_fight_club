@@ -38,6 +38,8 @@ export type OwnedFini = {
   latestPrice: number;
   /** Live price move (real mood) in percent-ish units from the API. */
   latestDelta: number;
+  /** Recent prices over the token's frequency window (for the card sparkline). */
+  priceHistory?: { date: number; price: number }[];
 };
 
 /**
