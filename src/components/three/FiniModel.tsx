@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Group } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
-import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_MOOD_IDLE_URL, FINI_EXTRA_CLIPS, finiModelUrl } from "../../lib/finiAssets";
+import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_MOOD_IDLE_URL, finiModelUrl } from "../../lib/finiAssets";
 import { applyMoodFace } from "../../lib/finiFaceMood";
 import type { FiniLiveMood } from "../../lib/finiMood";
 
@@ -34,10 +34,6 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
   const moodNeutral = useGLTF(FINI_MOOD_IDLE_URL.neutral.url);
   const moodSad = useGLTF(FINI_MOOD_IDLE_URL.sad.url);
   const moodSick = useGLTF(FINI_MOOD_IDLE_URL.sick.url);
-  // Experimental expressive loops (vomit / dance), retargeted onto the character
-  // rig. Loaded so the test page can play them by name before they go live.
-  const extraVomit = useGLTF(FINI_EXTRA_CLIPS.vomit.url);
-  const extraDance = useGLTF(FINI_EXTRA_CLIPS.dance.url);
 
   // Clone so the same token can render in several canvases at once (e.g. a
   // clan-card thumb and the big viewer) — a THREE object has one parent, so
@@ -58,10 +54,8 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
       ...moodNeutral.animations,
       ...moodSad.animations,
       ...moodSick.animations,
-      ...extraVomit.animations,
-      ...extraDance.animations,
     ],
-    [char.animations, anims.animations, moodNeutral.animations, moodSad.animations, moodSick.animations, extraVomit.animations, extraDance.animations],
+    [char.animations, anims.animations, moodNeutral.animations, moodSad.animations, moodSick.animations],
   );
 
   const { actions, names } = useAnimations(mergedClips, groupRef);
