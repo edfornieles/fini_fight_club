@@ -126,6 +126,10 @@ export function DevWalletSwitcher() {
 
           <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>Current: <span style={{ color: "#fff", fontFamily: "monospace" }}>{short}</span></div>
 
+          <div style={{ fontSize: 10, color: "#fbbf24", background: "#78350f55", border: "1px solid #b45309", borderRadius: 6, padding: "5px 7px", marginBottom: 8, lineHeight: 1.4 }}>
+            View-only online: impersonation shows an account's real CUTE$ balance but can't bet/claim (no signature). To play with real CUTE$, connect a real wallet and fund it from the operator console.
+          </div>
+
           <input
             value={input}
             onChange={e => setInput(e.target.value)}

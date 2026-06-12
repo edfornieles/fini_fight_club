@@ -125,6 +125,42 @@ export function EconomyPanel({ canWrite }: { canWrite: boolean }) {
         ))}
         {cfg?.updated_at && <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>Last edited {new Date(cfg.updated_at).toLocaleString()}{cfg.updated_by ? ` by ${cfg.updated_by.slice(0, 10)}…` : ""}</div>}
       </Card>
+
+      {canWrite && <FundWallet />}
     </div>
+  );
+}
+
+/** Top up any wallet with CUTE$ — for funding real test wallets (connect a
+ *  throwaway MetaMask, paste its address here, fund, and it plays for real). */
+function FundWallet() {
+  const [wallet, setWallet] = useState("");
+  const [amount, setAmount] = useState("10000");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const valid = /^0x[a-fA-F0-9]{40}$/.test(wallet.trim());
+  async function fund() {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api.admin.walletFund(wallet.trim().toLowerCase(), Number(amount));
+      setMsg(`✓ Funded — new balance ${r.newBalance.toLocaleString()} CUTE$`);
+    } catch (e) { setMsg(`✕ ${e instanceof Error ? e.message : "failed"}`); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Card title="Fund a test wallet">
+      <p style={{ fontSize: 12, color: "#888", margin: "0 0 12px" }}>
+        Connect a real (throwaway) wallet on the site, then paste its address here to credit CUTE$ instantly —
+        no Fini ownership or daily-grant wait needed. Credited via the audited ledger as an admin grant.
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <input placeholder="0x… wallet address" value={wallet} onChange={(e) => setWallet(e.target.value)}
+          style={{ flex: "1 1 320px", padding: "8px 10px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, fontFamily: "monospace" }} />
+        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+          style={{ width: 120, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, fontWeight: 700 }} />
+        <Btn tone="primary" disabled={!valid || busy || Number(amount) < 1} onClick={fund}>{busy ? "Funding…" : "Fund CUTE$"}</Btn>
+      </div>
+      {msg && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: msg.startsWith("✓") ? "#16a34a" : "#dc2626" }}>{msg}</div>}
+    </Card>
   );
 }

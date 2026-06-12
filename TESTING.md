@@ -42,6 +42,28 @@ everything you see in the browser should match it.
 
 ---
 
+## 1b. Test accounts that play with REAL CUTE$
+There are three kinds of account; only real-session ones transact real CUTE$:
+
+- **House bots** (`0xb07…`) — already real (ledger-funded, play via the worker).
+  They're your live opposition; nothing to set up.
+- **Real wallets** — the only way a *human* plays for real. Server CUTE$ requires
+  a SIWE session, which needs a real signature.
+- **Dev impersonation** (the `?dev=1` panel) — **view-only online.** It shows an
+  account's real balance but can't bet/claim (no signature). Use it to inspect,
+  not to play. You can't "play as" the seeded whales — you don't hold their keys.
+
+**To set up real test players:**
+1. Make a few throwaway MetaMask accounts (or use real ones).
+2. On the site, connect each → sign in (SIWE). New wallet = **0 CUTE$** (correct).
+3. Fund them: operator console → **Economy → Fund a test wallet** → paste the
+   address + amount → instant CUTE$ via the audited ledger (admin grant). No Fini
+   ownership or daily-grant wait. (Or, if a wallet owns Finis, just use `/claim`.)
+4. They now play with real CUTE$ end-to-end — bet, win, settle, payout, history.
+
+This is admin-only (your `ADMIN_WALLETS`) and logged in the Audit tab. It's plain
+granting, not a back door — there's no "log in as anyone" capability.
+
 ## 2. Hands-on play loop (the real test)
 On the deployed site:
 1. **Connect wallet** → sign the SIWE message. Balance chip shows your **real

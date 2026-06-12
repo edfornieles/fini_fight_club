@@ -64,6 +64,8 @@ export const api = {
       call<{ ok: true; wallet: string }>(`/admin-ops`, { body: { action: "bot.update", wallet, ...patch } }),
     botRetire: (wallet: string) =>
       call<{ ok: true; wallet: string; swept: number }>(`/admin-ops`, { body: { action: "bot.retire", wallet } }),
+    walletFund: (wallet: string, amount: number) =>
+      call<{ ok: true; wallet: string; amount: number; newBalance: number }>(`/admin-ops`, { body: { action: "wallet.fund", wallet, amount } }),
     botSpawn: (args: { handle: string; strategyType: string; params?: Record<string, unknown>; stake?: number; maxPerDay?: number; seed?: number }) =>
       call<{ ok: true; wallet: string; handle: string; balance: number }>(`/admin-ops`, { body: { action: "bot.spawn", ...args } }),
     battleResolve: (battleId: string, winningSide: "A" | "B", reason: string) =>

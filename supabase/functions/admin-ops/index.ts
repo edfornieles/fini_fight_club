@@ -163,6 +163,22 @@ Deno.serve(async (req) => {
         return jsonResponse({ ok: true, battleId, result: data });
       }
 
+      case "wallet.fund": {
+        // Top up any wallet with CUTE$ (admin grant) — for funding real test
+        // wallets without owning Finis or waiting on the daily drop. Logged.
+        const wallet = lc(body.wallet);
+        if (!isWallet(wallet)) return jsonResponse({ error: "bad_wallet" }, 400);
+        const amount = clampInt(body.amount ?? 10000, 1, 100_000_000);
+        const idem = `adminfund:${wallet}:${Date.now()}`;
+        const { data, error } = await sb.rpc("credit_balance", {
+          p_wallet: wallet, p_amount: amount, p_reason: "admin_grant",
+          p_idempotency_key: idem, p_metadata: { kind: "admin_test_fund" },
+        });
+        if (error) throw error;
+        await log({ wallet, amount });
+        return jsonResponse({ ok: true, wallet, amount, newBalance: Number((data as { new_balance?: number }[] | null)?.[0]?.new_balance ?? 0) });
+      }
+
       case "actions.recent": {
         const limit = clampInt(body.limit ?? 50, 1, 200);
         const { data } = await sb.from("admin_actions")
