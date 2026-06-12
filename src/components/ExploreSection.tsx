@@ -592,7 +592,7 @@ function InlineFiniViewer({ clan, familyLabel, familyCode, familyColor, tokens, 
               <img src={asset(`/clan-art/${clanSlug}.gif`)} alt={clan.clan} style={{ height: "80%", width: "auto", objectFit: "contain" }} />
             </div>
           );
-          return token ? <Fini3DPreview tokenId={token} fallback={media} mood={mood} /> : media;
+          return token ? <Fini3DPreview tokenId={token} fallback={media} mood={mood} workout /> : media;
         })()}
       </div>
       <div style={{ padding: "12px 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)" }}>

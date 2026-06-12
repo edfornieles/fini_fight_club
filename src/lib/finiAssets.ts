@@ -27,10 +27,20 @@ export const FINI_MOOD_IDLE_URL: Record<"happy" | "neutral" | "sad" | "sick", { 
 type MoodClip = { clip: string; upright: boolean };
 const m = (name: string, upright = true): MoodClip => ({ clip: name, upright });
 export const MOOD_CLIP_SETS: Record<"happy" | "neutral" | "sad" | "sick", MoodClip[]> = {
-  happy:   [m("fin_dance"), m("fin_dancingwithstars"), m("fin_hugesurprise")],
-  neutral: [m("fin_neutral_idle"), m("fin_bored"), m("fin_hungrystomach")],
+  happy:   [m("fin_happy_workout"), m("fin_dance"), m("fin_dancingwithstars"), m("fin_hugesurprise")],
+  neutral: [m("fin_neutral_workout"), m("fin_neutral_idle"), m("fin_bored"), m("fin_hungrystomach")],
   sad:     [m("fin_mope"), m("fin_angry"), m("fin_cough"), m("fin_distresssway")],
   sick:    [m("fin_neardead", false), m("fin_raincrying", false), m("fin_raindesperate", false), m("fin_rollingaroundtherain", false), m("fin_banginghead", false)],
+};
+
+// Workout-themed mood: the coin's performance "over a time period" reads as a
+// training session — winning trains hard and happy, losing struggles, crashing
+// ends up on the floor. Used where performance-over-time is the focus (Explore).
+export const WORKOUT_MOOD_CLIP: Record<"happy" | "neutral" | "sad" | "sick", string> = {
+  happy:   "fin_happy_workout",
+  neutral: "fin_neutral_workout",
+  sad:     "fin_mope",
+  sick:    "fin_neardead",
 };
 // Every clip GLB url (deduped) — FiniModel loads the whole set once (cached
 // globally by drei) so any token can play any mood clip.

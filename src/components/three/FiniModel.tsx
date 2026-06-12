@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Group } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
-import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, ALL_MOOD_CLIP_URLS, pickMoodClip, finiModelUrl } from "../../lib/finiAssets";
+import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, ALL_MOOD_CLIP_URLS, WORKOUT_MOOD_CLIP, pickMoodClip, finiModelUrl } from "../../lib/finiAssets";
 import { applyMoodFace } from "../../lib/finiFaceMood";
 import type { FiniLiveMood } from "../../lib/finiMood";
 
@@ -20,9 +20,13 @@ type FiniModelProps = {
    *  dramatic prone clips (near-dead collapse) read as a crumpled speck in a
    *  120px card. The big viewer / arena leave this off for the full drama. */
   compact?: boolean;
+  /** Performance-over-time view (Explore): the mood reads as a workout —
+   *  training hard + happy when winning, struggling when down, floored when
+   *  crashing — instead of the random dance/idle pick. */
+  workout?: boolean;
 };
 
-export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood, compact = false }: FiniModelProps) {
+export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood, compact = false, workout = false }: FiniModelProps) {
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
@@ -55,9 +59,12 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood, compa
 
   useEffect(() => {
     if (!actions || names.length === 0) return;
-    // Priority: explicit battle clip → a random clip from the mood tier
-    // (deterministic per token, so the collection varies) → happy idle.
-    const moodClip = mood ? pickMoodClip(tokenId, mood, compact) : undefined;
+    // Priority: explicit battle clip → mood body clip → happy idle. Mood body
+    // clip is the workout interpretation (performance view) or a random pick
+    // from the tier (deterministic per token, so the collection varies).
+    const moodClip = mood
+      ? (workout ? WORKOUT_MOOD_CLIP[mood] : pickMoodClip(tokenId, mood, compact))
+      : undefined;
     const target = (clip && actions[clip] ? clip : null)
       ?? (moodClip && actions[moodClip] ? moodClip : null)
       ?? (actions[FINI_IDLE_CLIP] ? FINI_IDLE_CLIP : names[0]);
@@ -68,7 +75,7 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood, compa
     return () => {
       action.fadeOut(0.25);
     };
-  }, [actions, names, clip, timeScale, mood, compact, tokenId]);
+  }, [actions, names, clip, timeScale, mood, compact, workout, tokenId]);
 
   return (
     <group ref={groupRef} scale={scale}>

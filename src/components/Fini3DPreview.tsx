@@ -17,12 +17,14 @@ const FiniStage = lazy(() => import("./three/FiniStage"));
  * (and unmounts when it leaves), so a wallet collection of hundreds of Finis
  * never spawns hundreds of live GL contexts — only the visible handful render.
  */
-export function Fini3DPreview({ tokenId, fallback, interactive = true, mood }: {
+export function Fini3DPreview({ tokenId, fallback, interactive = true, mood, workout = false }: {
   tokenId: string | number;
   fallback?: ReactNode;
   interactive?: boolean;
   /** Live price mood — drives the body clip, face, and playback speed. */
   mood?: FiniLiveMood;
+  /** Performance view: mood reads as a workout (Explore). */
+  workout?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -44,7 +46,7 @@ export function Fini3DPreview({ tokenId, fallback, interactive = true, mood }: {
         <ArenaErrorBoundary fallback={fallback} resetKey={tokenId}>
           <Suspense fallback={fallback ?? null}>
             <div style={{ position: "absolute", inset: 0 }}>
-              <FiniStage tokenId={tokenId} interactive={interactive} timeScale={mood ? MOOD_META[mood].timeScale : 1} mood={mood} compact={!interactive} />
+              <FiniStage tokenId={tokenId} interactive={interactive} timeScale={mood ? MOOD_META[mood].timeScale : 1} mood={mood} compact={!interactive} workout={workout} />
             </div>
           </Suspense>
         </ArenaErrorBoundary>

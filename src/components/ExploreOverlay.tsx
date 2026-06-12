@@ -439,7 +439,7 @@ function FiniViewer({
               />
             </div>
           );
-          return token ? <Fini3DPreview tokenId={token} fallback={media} mood={mood} /> : media;
+          return token ? <Fini3DPreview tokenId={token} fallback={media} mood={mood} workout /> : media;
         })()}
       </div>
 
