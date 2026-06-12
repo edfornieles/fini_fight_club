@@ -8,8 +8,10 @@ import type { FiniLiveMood } from "../../lib/finiMood";
 
 useGLTF.preload(FINI_ANIMATIONS_URL);
 
-// Mood idle clip name for a given mood (happy uses the character's own clip).
+// Mood → body clip. Each Fini emotes its linked-coin mood: dancing when up,
+// moping when down, collapsing when crashing.
 const MOOD_IDLE_CLIP: Partial<Record<FiniLiveMood, string>> = {
+  happy: FINI_MOOD_IDLE_URL.happy.clip,
   neutral: FINI_MOOD_IDLE_URL.neutral.clip,
   sad: FINI_MOOD_IDLE_URL.sad.clip,
   sick: FINI_MOOD_IDLE_URL.sick.clip,
@@ -29,8 +31,9 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
-  // Mood idle clips (converted from the original rig FBX). Loaded once and
-  // cached globally by drei; clips retarget by bone name onto any character.
+  // Mood body clips (retargeted onto the rig). Loaded once and cached globally
+  // by drei; retarget by bone name onto any character.
+  const moodHappy = useGLTF(FINI_MOOD_IDLE_URL.happy.url);
   const moodNeutral = useGLTF(FINI_MOOD_IDLE_URL.neutral.url);
   const moodSad = useGLTF(FINI_MOOD_IDLE_URL.sad.url);
   const moodSick = useGLTF(FINI_MOOD_IDLE_URL.sick.url);
@@ -51,11 +54,12 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
     () => [
       ...char.animations,
       ...anims.animations,
+      ...moodHappy.animations,
       ...moodNeutral.animations,
       ...moodSad.animations,
       ...moodSick.animations,
     ],
-    [char.animations, anims.animations, moodNeutral.animations, moodSad.animations, moodSick.animations],
+    [char.animations, anims.animations, moodHappy.animations, moodNeutral.animations, moodSad.animations, moodSick.animations],
   );
 
   const { actions, names } = useAnimations(mergedClips, groupRef);

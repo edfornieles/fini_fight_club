@@ -16,6 +16,8 @@ import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { pickGhostOpponent, shortenWallet, synthFini, loadGhostTeams } from "../game/ghostOpponents";
 import { myTeamName, saveMyTeamName, generatedTeamName } from "../lib/teamNames";
 import { Fini3DPreview } from "../components/Fini3DPreview";
+import { useFamilyDeltas } from "../lib/familyDeltas";
+import { moodFromDeltaPct } from "../lib/finiMood";
 import { useTreasury } from "../state/treasuryStore";
 import { FAMILY_ROLE, ROLE_META, ITEM_SYNERGY, SYNERGY_BONUS_MULTIPLIER, hasSynergy, familyDamageMultiplier, type FamilyRole } from "../game/familyRoles";
 
@@ -1003,6 +1005,7 @@ function WorkshopView({
                                   <FiniBattleCard
                                     fini={f}
                                     position={f.family}
+                                    media3d
                                     onClick={() => { /* card has its own Profile button */ }}
                                     highlighted={false}
                                     active={false}
@@ -1609,6 +1612,10 @@ function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap
   const isResting = useFiniRecords(s => s.isResting(fini.id));
   const restMs    = useFiniRecords(s => s.restingMsLeft(fini.id));
   const navigate = useNavigate();
+  // Each Fini emotes its linked coin's live mood (24h move of its family).
+  const fam = useFamilyDeltas();
+  const famDelta = fam?.[fini.family]?.["1D"];
+  const cardMood = typeof famDelta === "number" ? moodFromDeltaPct(famDelta) : undefined;
   const wins   = record?.wins ?? 0;
   const losses = record?.losses ?? 0;
   const level  = record?.level ?? 1;
@@ -1638,7 +1645,7 @@ function FiniBattleCard({ fini, position, onClick, highlighted, active, showSwap
           const gif = <img src={asset(`/clan-art/${slugify(fini.clan)}.gif`)} alt="" style={{ height: 90, width: "auto", objectFit: "contain", filter: isResting ? "grayscale(0.6)" : "none" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
           // Resting Finis keep the grayscale gif — the nap should look like one.
           return media3d && !isResting
-            ? <Fini3DPreview tokenId={modelTokenIdOf(fini)} fallback={gif} interactive={false} />
+            ? <Fini3DPreview tokenId={modelTokenIdOf(fini)} fallback={gif} interactive={false} mood={cardMood} />
             : gif;
         })()}
         {fini.item && (

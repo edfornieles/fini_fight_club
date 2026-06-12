@@ -13,7 +13,8 @@ import { asset } from "./assetUrl";
 // Verified clips retargeted onto the character rig (the direct-export sad/
 // supersad idles exploded — only neutral survived; sad/very-sad use the
 // expressive retargeted clips that render clean).
-export const FINI_MOOD_IDLE_URL: Record<"neutral" | "sad" | "sick", { url: string; clip: string }> = {
+export const FINI_MOOD_IDLE_URL: Record<"happy" | "neutral" | "sad" | "sick", { url: string; clip: string }> = {
+  happy:   { url: asset("/anim/fin_dance.glb"),        clip: "fin_dance" },
   neutral: { url: asset("/anim/fin_neutral_idle.glb"), clip: "fin_neutral_idle" },
   sad:     { url: asset("/anim/fin_mope.glb"),         clip: "fin_mope" },
   sick:    { url: asset("/anim/fin_neardead.glb"),     clip: "fin_neardead" },
