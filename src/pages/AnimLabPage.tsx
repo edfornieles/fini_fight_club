@@ -21,14 +21,12 @@ const GROUPS: { mood: string; face: FiniLiveMood; clips: { label: string; clip: 
     { label: "hungry stomach", clip: "fin_hungrystomach" },
   ]},
   { mood: "🙁 Sad", face: "sad", clips: [
-    { label: "sad idle", clip: "fin_sad_idle" },
     { label: "mope", clip: "fin_mope" },
     { label: "angry", clip: "fin_angry" },
     { label: "cough", clip: "fin_cough" },
     { label: "distress sway", clip: "fin_distresssway" },
   ]},
   { mood: "🤢 Very sad / dying", face: "sick", clips: [
-    { label: "supersad idle", clip: "fin_supersad_idle" },
     { label: "near dead", clip: "fin_neardead" },
     { label: "rain crying", clip: "fin_raincrying" },
     { label: "rain desperate", clip: "fin_raindesperate" },
@@ -43,7 +41,7 @@ const urlFor = (clip: string) => asset(`/anim/${clip}.glb`);
 export function AnimLabPage() {
   const [tokenInput, setTokenInput] = useState("4104");
   const [tokenId, setTokenId] = useState("4104");
-  const [clip, setClip] = useState("fin_dance");
+  const [clip, setClip] = useState("fin_neutral_idle");
   const mood: FiniLiveMood = FACE_OF.get(clip) ?? "happy";
 
   return (

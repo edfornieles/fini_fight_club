@@ -10,10 +10,13 @@ export const FINI_IDLE_CLIP = "fin_happy_idle";
 // and bundled locally. Same Fin_Bone_* skeleton as the characters → retarget
 // onto any token. `happy` uses the character GLB's own baked fin_happy_idle.
 import { asset } from "./assetUrl";
+// Verified clips retargeted onto the character rig (the direct-export sad/
+// supersad idles exploded — only neutral survived; sad/very-sad use the
+// expressive retargeted clips that render clean).
 export const FINI_MOOD_IDLE_URL: Record<"neutral" | "sad" | "sick", { url: string; clip: string }> = {
-  neutral: { url: asset("/anim/fin_neutral_idle.glb"),  clip: "fin_neutral_idle" },
-  sad:     { url: asset("/anim/fin_sad_idle.glb"),      clip: "fin_sad_idle" },
-  sick:    { url: asset("/anim/fin_supersad_idle.glb"), clip: "fin_supersad_idle" },
+  neutral: { url: asset("/anim/fin_neutral_idle.glb"), clip: "fin_neutral_idle" },
+  sad:     { url: asset("/anim/fin_mope.glb"),         clip: "fin_mope" },
+  sick:    { url: asset("/anim/fin_neardead.glb"),     clip: "fin_neardead" },
 };
 // Battle-state → clip map (from the working reference build battles.pixelsolve.net):
 export const FINI_STATE_CLIPS = { start:"fin_battle_A1", idle:"fin_battle_C1", attack:"fin_battle_B1", defend:"fin_battle_D3", winner:"fin_battle_F2", loser:"fin_battle_F3" } as const;
