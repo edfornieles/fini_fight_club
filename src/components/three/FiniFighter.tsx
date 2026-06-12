@@ -3,9 +3,18 @@ import { Group, Vector3, AnimationClip, Mesh, Material } from "three";
 import { useFrame } from "@react-three/fiber";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
-import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, finiModelUrl } from "../../lib/finiAssets";
+import { FINI_ANIMATIONS_URL, FINI_IDLE_CLIP, FINI_MOOD_IDLE_URL, finiModelUrl } from "../../lib/finiAssets";
+import { applyMoodFace } from "../../lib/finiFaceMood";
+import type { FiniLiveMood } from "../../lib/finiMood";
 
 useGLTF.preload(FINI_ANIMATIONS_URL);
+
+const MOOD_CLIP: Record<FiniLiveMood, string> = {
+  happy: FINI_MOOD_IDLE_URL.happy.clip,
+  neutral: FINI_MOOD_IDLE_URL.neutral.clip,
+  sad: FINI_MOOD_IDLE_URL.sad.clip,
+  sick: FINI_MOOD_IDLE_URL.sick.clip,
+};
 
 type Vec3 = [number, number, number];
 
@@ -22,6 +31,8 @@ type FiniFighterProps = {
   ko?: boolean;
   /** Opening ceremony: glide in from offstage x, then bow. Staggered per slot. */
   intro?: { fromX: number; delayMs?: number } | null;
+  /** Live mood — plays the matching body clip + face when no explicit clip. */
+  mood?: FiniLiveMood;
 };
 
 // Opening-ceremony timings (ms): glide in, beat, bow down + up.
@@ -50,11 +61,18 @@ export function FiniFighter({
   rotation = [0, 0, 0],
   ko = false,
   intro = null,
+  mood,
 }: FiniFighterProps) {
   const groupRef = useRef<Group>(null);
   const innerRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
+  // Mood body clips (only loaded/merged when a mood is in play — Fight Club
+  // passes explicit clips and no mood, so this stays inert there).
+  const moodHappy = useGLTF(FINI_MOOD_IDLE_URL.happy.url);
+  const moodNeutral = useGLTF(FINI_MOOD_IDLE_URL.neutral.url);
+  const moodSad = useGLTF(FINI_MOOD_IDLE_URL.sad.url);
+  const moodSick = useGLTF(FINI_MOOD_IDLE_URL.sick.url);
 
   // Clone the scene so multiple fighters get independent skeletons, and clone
   // materials so per-fighter opacity (KO fade) can't bleed into other clones
@@ -82,15 +100,26 @@ export function FiniFighter({
   }, [ko, sceneClone]);
 
   const mergedClips = useMemo<AnimationClip[]>(
-    () => [...char.animations, ...anims.animations],
-    [char.animations, anims.animations],
+    () => [
+      ...char.animations, ...anims.animations,
+      ...moodHappy.animations, ...moodNeutral.animations, ...moodSad.animations, ...moodSick.animations,
+    ],
+    [char.animations, anims.animations, moodHappy.animations, moodNeutral.animations, moodSad.animations, moodSick.animations],
   );
+
+  // Mood face (mouth) tracks the body, like the Explore/wallet Finis.
+  useEffect(() => {
+    if (mood) applyMoodFace(sceneClone, mood);
+  }, [sceneClone, mood]);
 
   const { actions, names } = useAnimations(mergedClips, groupRef);
 
   useEffect(() => {
     if (!actions || names.length === 0) return;
+    // Explicit battle clip → mood body clip → idle.
+    const moodClip = mood ? MOOD_CLIP[mood] : undefined;
     const target = (clip && actions[clip] ? clip : null)
+      ?? (moodClip && actions[moodClip] ? moodClip : null)
       ?? (actions[FINI_IDLE_CLIP] ? FINI_IDLE_CLIP : names[0]);
     const action = actions[target];
     if (!action) return;
@@ -98,7 +127,7 @@ export function FiniFighter({
     return () => {
       action.fadeOut(0.25);
     };
-  }, [actions, names, clip]);
+  }, [actions, names, clip, mood]);
 
   // Opening ceremony clock — starts on mount, per-fighter delay staggers the
   // team's entrance.

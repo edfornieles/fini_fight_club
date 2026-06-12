@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useParams, Link } from "react-router-dom";
+import { ArenaErrorBoundary } from "../components/three/ArenaErrorBoundary";
+const CryptoArenaBattle3D = lazy(() => import("../components/three/CryptoArenaBattle3D"));
 import { getBattleById, ASSET_META } from "../data/mockBattles";
 import { useUIStore } from "../state/uiStore";
 import { ResolutionAuditPanel } from "../components/ResolutionAuditPanel";
@@ -760,19 +762,25 @@ function BattleArenaHero({
       minHeight: minH,
       transition: "min-height 0.4s ease",
     }}>
-      {/* Background placeholder art — two Finis facing off */}
-      <img
-        src="/battle-placeholder.png"
-        alt=""
-        onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          objectFit: "contain", objectPosition: "center 60%",
-          opacity: placed ? 1 : 0.55,
-          transition: "opacity 0.4s ease",
-          pointerEvents: "none",
-        }}
-      />
+      {/* 3D duel — one Fini per competing coin (random family member): they
+          walk in, bow, then emote how their coin is doing in this battle.
+          Error boundary falls back to the placeholder art if WebGL fails. */}
+      <ArenaErrorBoundary fallback={
+        <img src="/battle-placeholder.png" alt="" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center 60%", opacity: placed ? 1 : 0.55, pointerEvents: "none" }} />
+      }>
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          <Suspense fallback={null}>
+            <CryptoArenaBattle3D
+              battleId={battle.id}
+              familyA={battle.familyA ?? battle.assets[0] ?? "BTC"}
+              familyB={battle.familyB ?? battle.assets[1]}
+              sideAPct={sideAPct}
+              sideBPct={sideBPct}
+            />
+          </Suspense>
+        </div>
+      </ArenaErrorBoundary>
 
       {/* Top overlay — side labels + percentages */}
       <div style={{
