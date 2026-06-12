@@ -742,8 +742,9 @@ function BattleArenaHero({
   }
 
   const placed = !!userBet;
-  // After prediction: bigger, more dramatic. Before: compact intro.
-  const minH = placed ? 480 : 260;
+  // The 3D duel is the centrepiece — give it room so the full Finis show
+  // (a short hero made a wide-letterbox canvas that cropped them at the waist).
+  const minH = placed ? 620 : 460;
 
   // Read the live entry status from store — so the hero footer flips from
   // "Awaiting price oracle" to "🎉 Won" / "💀 Lost" / "↩️ Voided" / "💸 Sold"

@@ -151,14 +151,20 @@ export function FiniFighter({
       }
       if (t < WALK_MS) {
         const p = easeInOut(t / WALK_MS);
+        // Walk-in: a stepping bob + slight forward lean reads as marching in,
+        // even without a dedicated walk clip. ~5 steps across the entrance.
+        const steps = Math.abs(Math.sin((t / WALK_MS) * Math.PI * 5));
+        const moving = 1 - Math.abs(p - 0.5) * 2; // fade the bob in/out at ends
         g.position.set(
           intro.fromX + (homePosition[0] - intro.fromX) * p,
-          homePosition[1],
+          homePosition[1] + steps * 0.12 * moving,
           homePosition[2],
         );
+        if (innerRef.current) innerRef.current.rotation.x = 0.12 * moving;
         return;
       }
       g.position.set(...homePosition);
+      if (innerRef.current) innerRef.current.rotation.x = 0;
       const bt = t - WALK_MS - BOW_PAUSE_MS;
       if (bt >= 0 && bt < BOW_MS) {
         // Lean toward the opponent (inner group: local +Z is the facing

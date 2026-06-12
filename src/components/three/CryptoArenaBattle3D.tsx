@@ -64,7 +64,9 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
 
   return (
     <Canvas shadows dpr={[1, 2]} style={{ width: "100%", height: "100%" }} gl={{ alpha: true }}>
-      <PerspectiveCamera makeDefault fov={42} position={[0, 1.7, 7.2]} />
+      {/* Pulled back + tilted down a touch so both full bodies (feet to head)
+          read in a wide hero. */}
+      <PerspectiveCamera makeDefault fov={38} position={[0, 1.9, 9.5]} onUpdate={c => c.lookAt(0, 1.0, 0)} />
       <ambientLight intensity={0.65} />
       <directionalLight position={[6, 12, 6]} intensity={1} castShadow />
       <directionalLight position={[-6, 5, -4]} intensity={0.35} />
