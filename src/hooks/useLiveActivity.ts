@@ -124,7 +124,7 @@ export function useLiveActivity({ battleId, limit = 30, pollMs = 8_000 }: Activi
 
 /**
  * Real volume per battle — sum of stakes for every prediction on that battle.
- * Returns FINI$. Cached per battleId for `pollMs` so repeat callers don't
+ * Returns CUTE$. Cached per battleId for `pollMs` so repeat callers don't
  * each fire their own query.
  */
 const _volCache = new Map<string, { value: number; at: number }>();

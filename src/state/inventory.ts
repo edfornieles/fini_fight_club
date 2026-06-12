@@ -62,7 +62,7 @@ interface InventoryState {
   add:     (id: PotionId, qty?: number) => void;
   consume: (id: PotionId) => boolean;        // returns true if consumed
   count:   (id: PotionId) => number;
-  /** Buy a potion: debits FINI$ on the server, then adds to inventory. */
+  /** Buy a potion: debits CUTE$ on the server, then adds to inventory. */
   buyPotion: (id: PotionId) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 

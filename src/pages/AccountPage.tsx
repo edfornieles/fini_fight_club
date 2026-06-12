@@ -293,7 +293,7 @@ export function AccountPage() {
               <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>Click a Fini to add or remove from your team</div>
             </div>
             <Link to="/claim" style={{ fontSize: 13, color: "#f472b6", fontWeight: 700, textDecoration: "none" }}>
-              + Claim Fini Coin →
+              + Claim CUTE$ →
             </Link>
           </div>
 

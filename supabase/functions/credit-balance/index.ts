@@ -7,13 +7,13 @@
  * pattern is a server-side cron / webhook.
  *
  * Reason must be one of:
- *   daily_grant, battle_payout, battle_refund, prediction_payout, prediction_refund
+ *   daily_grant, rescue_grant, battle_payout, battle_refund, prediction_payout, prediction_refund
  */
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/auth.ts";
 
 const ALLOWED_REASONS = new Set([
-  "daily_grant", "battle_payout", "battle_refund",
+  "daily_grant", "rescue_grant", "battle_payout", "battle_refund",
   "prediction_payout", "prediction_refund", "admin_grant",
 ]);
 

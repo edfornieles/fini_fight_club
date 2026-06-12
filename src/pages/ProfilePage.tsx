@@ -5,6 +5,8 @@ import { useMyEntries } from "../state/myEntriesStore";
 import { Link } from "react-router-dom";
 import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { ActivityHub } from "../components/ActivityHub";
+import { BetHistoryList } from "../components/BetHistory";
+import { useBetHistory } from "../hooks/useBetHistory";
 
 const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
@@ -29,9 +31,12 @@ export function ProfilePage() {
   const { walletAddress } = useUIStore();
   const balance = useCoinStore(s => s.balance);
   const entries = useMyEntries(s => s.entries);
-  // Real economy figures derived from the wallet's prediction entries.
-  const finiCoinSpent = entries.reduce((sum, e) => sum + e.stake, 0);
-  const finiCoinWon = entries.reduce((sum, e) => sum + (e.status === "won" ? (e.result?.payout ?? 0) : 0), 0);
+  // Real server-backed bet history + record for this wallet.
+  const { bets, stats, loading: histLoading } = useBetHistory(walletAddress);
+  // Economy figures: prefer the real settled totals; fall back to local entries
+  // (offline/dev) when the server history is empty.
+  const finiCoinSpent = stats.staked || entries.reduce((sum, e) => sum + e.stake, 0);
+  const finiCoinWon = stats.returned || entries.reduce((sum, e) => sum + (e.status === "won" ? (e.result?.payout ?? 0) : 0), 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
@@ -62,7 +67,7 @@ export function ProfilePage() {
     );
   }
 
-  const winRatePct = Math.round(MOCK_STATS.winRate * 100);
+  const winRatePct = stats.won + stats.lost > 0 ? stats.winRatePct : Math.round(MOCK_STATS.winRate * 100);
 
   return (
     <div style={{ ...S, background: "#f8f9fa", minHeight: "100vh" }}>
@@ -77,8 +82,9 @@ export function ProfilePage() {
       </div>
 
       {/* Primary content: forecast track record — the player's own activity */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 48px 0" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 48px 0", display: "flex", flexDirection: "column", gap: 24 }}>
         <ActivityHub />
+        <BetHistoryList bets={bets} loading={histLoading} />
       </div>
 
       {/* Secondary: account settings + avatar etc. */}
@@ -156,7 +162,7 @@ export function ProfilePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {[
                 { label: "Battle wins", default: true },
-                { label: "Daily Fini Coin grant", default: true },
+                { label: "Daily CUTE$ grant", default: true },
                 { label: "Tournament invites", default: false },
                 { label: "Newsletter", default: false },
               ].map(opt => (
@@ -171,24 +177,24 @@ export function ProfilePage() {
 
         {/* Right: stats */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* FINI$ Balance */}
-          <Card title="🪙 FINI$" subtitle="Your in-game currency balance">
+          {/* CUTE$ Balance */}
+          <Card title="🪙 CUTE$" subtitle="Your in-game currency balance">
             <div style={{ background: "linear-gradient(135deg, #fef3c7, #fde047)", borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#854d0e", textTransform: "uppercase", letterSpacing: "0.06em" }}>Current Balance</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#111" }}>{balance.toLocaleString()} <span style={{ fontSize: 18, color: "#854d0e" }}>FINI$</span></div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#111" }}>{balance.toLocaleString()} <span style={{ fontSize: 18, color: "#854d0e" }}>CUTE$</span></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Stat label="Won" value={`${finiCoinWon.toLocaleString()}`} sub="FINI$ from battles" color="#16a34a" />
-              <Stat label="Spent" value={`${finiCoinSpent.toLocaleString()}`} sub="FINI$ on predictions" color="#dc2626" />
+              <Stat label="Won" value={`${finiCoinWon.toLocaleString()}`} sub="CUTE$ from battles" color="#16a34a" />
+              <Stat label="Spent" value={`${finiCoinSpent.toLocaleString()}`} sub="CUTE$ on predictions" color="#dc2626" />
             </div>
           </Card>
 
           {/* Battle stats */}
           <Card title="⚔️ Battle Record" subtitle="Your win/loss tally">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
-              <Stat label="Played" value={String(MOCK_STATS.battlesPlayed)} sub="battles" />
-              <Stat label="Won"    value={String(MOCK_STATS.battlesWon)}    sub="victories" color="#16a34a" />
-              <Stat label="Lost"   value={String(MOCK_STATS.battlesLost)}   sub="defeats"   color="#dc2626" />
+              <Stat label="Played" value={String(stats.played)} sub="settled" />
+              <Stat label="Won"    value={String(stats.won)}    sub="victories" color="#16a34a" />
+              <Stat label="Lost"   value={String(stats.lost)}   sub="defeats"   color="#dc2626" />
             </div>
             <div style={{ background: "#f9fafb", borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#666", marginBottom: 6 }}>
@@ -222,7 +228,7 @@ export function ProfilePage() {
           <Card title="Quick Links" subtitle="">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <QuickLink to="/account" icon="🐾" label="My Stable" />
-              <QuickLink to="/claim"   icon="🪙" label="Claim FINI$"  />
+              <QuickLink to="/claim"   icon="🪙" label="Claim CUTE$"  />
               <QuickLink to="/crypto"  icon="⚔️" label="Crypto Arena" />
               <QuickLink to="/"        icon="🏠" label="Home"     />
             </div>

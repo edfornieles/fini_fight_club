@@ -85,9 +85,9 @@ export function ClaimPage() {
         {/* Page header */}
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={{ fontSize: 52, marginBottom: 12 }}>🪙</div>
-          <h1 style={{ fontSize: 34, fontWeight: 900, color: "#111", margin: "0 0 10px" }}>Fini Coin Claim</h1>
+          <h1 style={{ fontSize: 34, fontWeight: 900, color: "#111", margin: "0 0 10px" }}>CUTE$ Claim</h1>
           <p style={{ fontSize: 16, color: "#666", maxWidth: 560, margin: "0 auto", lineHeight: 1.7 }}>
-            Existing Fini NFT holders can claim an initial Fini Coin allocation to start playing in the Battle Arena.
+            Existing Fini NFT holders can claim an initial CUTE$ allocation to start playing in the Battle Arena.
           </p>
         </div>
 
@@ -95,46 +95,46 @@ export function ClaimPage() {
           {/* Left: how it works */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* What is Fini Coin */}
-            <InfoCard title="What is Fini Coin?">
-              <p style={P}>Fini Coin is an <strong>internal, non-transferable game currency</strong> used exclusively inside Fini Crypto Battle Arena. It has no real-world value and cannot be withdrawn, sold, transferred, or exchanged for money, crypto, NFTs, or anything of monetary value.</p>
-              <p style={P}>You use Fini Coin to predict battle outcomes, enter arenas, and participate in clan competitions. Think of it as battle energy — the fuel that powers your predictions.</p>
+            {/* What is CUTE$ */}
+            <InfoCard title="What is CUTE$?">
+              <p style={P}>CUTE$ is an <strong>internal, non-transferable game currency</strong> used exclusively inside Fini Crypto Battle Arena. It has no real-world value and cannot be withdrawn, sold, transferred, or exchanged for money, crypto, NFTs, or anything of monetary value.</p>
+              <p style={P}>You use CUTE$ to predict battle outcomes, enter arenas, and participate in clan competitions. Think of it as battle energy — the fuel that powers your predictions.</p>
               <div style={{ background: "#fef9c3", border: "1.5px solid #fde047", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#854d0e", fontWeight: 600, lineHeight: 1.6, marginTop: 8 }}>
-                Fini Coin is a game currency. It may not become money, a token, or anything redeemable. Future ecosystem rewards, if any, are discretionary and subject to legal and regulatory review.
+                CUTE$ is a game currency. It may not become money, a token, or anything redeemable. Future ecosystem rewards, if any, are discretionary and subject to legal and regulatory review.
               </div>
             </InfoCard>
 
             {/* Claim formula */}
             <InfoCard title="Your Claim Allocation">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                <AllocRow label="One-time per Fini" value={`${BASE_CLAIM.toLocaleString()} FINI$`} color="#f472b6" />
-                <AllocRow label="Per Fini NFT (once each)" value={`${PER_FINI.toLocaleString()} FINI$`} color="#a78bfa" />
-                <AllocRow label="Each Fini redeemable once" value={`${MAX_CLAIM.toLocaleString()} FINI$`} color="#60a5fa" />
+                <AllocRow label="One-time per Fini" value={`${BASE_CLAIM.toLocaleString()} CUTE$`} color="#f472b6" />
+                <AllocRow label="Per Fini NFT (once each)" value={`${PER_FINI.toLocaleString()} CUTE$`} color="#a78bfa" />
+                <AllocRow label="Each Fini redeemable once" value={`${MAX_CLAIM.toLocaleString()} CUTE$`} color="#60a5fa" />
                 <AllocRow label="Campaign status" value="Active" color="#22c55e" />
               </div>
               <div style={{ background: "#f9fafb", borderRadius: 12, padding: "14px 16px", fontSize: 13 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", color: "#666", marginBottom: 5 }}>
-                  <span>One-time per Fini</span><span style={{ fontWeight: 700 }}>{BASE_CLAIM.toLocaleString()} FINI$</span>
+                  <span>One-time per Fini</span><span style={{ fontWeight: 700 }}>{BASE_CLAIM.toLocaleString()} CUTE$</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", color: "#666", marginBottom: 5 }}>
-                  <span>Finis held × {PER_FINI} FINI$</span><span style={{ fontWeight: 700 }}>{finiCount} × {PER_FINI} = {(finiCount * PER_FINI).toLocaleString()} FINI$</span>
+                  <span>Finis held × {PER_FINI} CUTE$</span><span style={{ fontWeight: 700 }}>{finiCount} × {PER_FINI} = {(finiCount * PER_FINI).toLocaleString()} CUTE$</span>
                 </div>
                 <div style={{ height: 1, background: "#e5e7eb", margin: "8px 0" }} />
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, color: "#111", fontSize: 15 }}>
                   <span>Your claim</span>
-                  <span style={{ color: "#f472b6" }}>{totalClaim.toLocaleString()} Fini Coin</span>
+                  <span style={{ color: "#f472b6" }}>{totalClaim.toLocaleString()} CUTE$</span>
                 </div>
               </div>
             </InfoCard>
 
             {/* Daily holder rewards */}
             <InfoCard title="Daily Holder Play Allowance">
-              <p style={P}>After your initial claim, Fini holders receive a daily Fini Coin grant to keep playing. This is not yield or income — it is battle energy to keep you in the arena.</p>
+              <p style={P}>After your initial claim, Fini holders receive a daily CUTE$ grant to keep playing. This is not yield or income — it is battle energy to keep you in the arena.</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
-                <AllocRow label="Non-holder daily grant" value="100 FINI$ / day" color="#9ca3af" />
-                <AllocRow label="Holder base grant" value="250 FINI$ / day" color="#f472b6" />
-                <AllocRow label="Per Fini bonus" value="50 FINI$ / day" color="#a78bfa" />
-                <AllocRow label="Your daily grant" value={`${250 + finiCount * 50} FINI$ / day`} color="#22c55e" />
+                <AllocRow label="Non-holder daily grant" value="100 CUTE$ / day" color="#9ca3af" />
+                <AllocRow label="Holder base grant" value="250 CUTE$ / day" color="#f472b6" />
+                <AllocRow label="Per Fini bonus" value="50 CUTE$ / day" color="#a78bfa" />
+                <AllocRow label="Your daily grant" value={`${250 + finiCount * 50} CUTE$ / day`} color="#22c55e" />
               </div>
             </InfoCard>
 
@@ -228,15 +228,15 @@ export function ClaimPage() {
                             <div style={{ fontSize: 12, fontWeight: 700, color: "#111" }}>Fini #{f.tokenId}</div>
                             <div style={{ fontSize: 10, color: "#888" }}>{f.family} · {f.clan}</div>
                           </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa" }}>+{PER_FINI} FINI$</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa" }}>+{PER_FINI} CUTE$</span>
                         </div>
                       ))}
                     </div>
                     <div style={{ background: "#f9fafb", borderRadius: 12, padding: "14px" }}>
-                      <Row label={`Base claim`} value={`${BASE_CLAIM.toLocaleString()} FINI$`} />
-                      <Row label={`${finiCount} Finis × ${PER_FINI} FINI$`} value={`${(finiCount * PER_FINI).toLocaleString()} FINI$`} />
+                      <Row label={`Base claim`} value={`${BASE_CLAIM.toLocaleString()} CUTE$`} />
+                      <Row label={`${finiCount} Finis × ${PER_FINI} CUTE$`} value={`${(finiCount * PER_FINI).toLocaleString()} CUTE$`} />
                       <div style={{ height: 1, background: "#e5e7eb", margin: "8px 0" }} />
-                      <Row label="Total" value={`${totalClaim.toLocaleString()} FINI$`} bold />
+                      <Row label="Total" value={`${totalClaim.toLocaleString()} CUTE$`} bold />
                     </div>
                     <button onClick={() => setStep("sign")} style={pinkBtn}>Proceed to Sign →</button>
                   </div>
@@ -253,7 +253,7 @@ export function ClaimPage() {
                     <div style={{ fontFamily: "monospace", fontSize: 10.5, background: "#111", color: "#a0aec0", borderRadius: 12, padding: "14px", lineHeight: 1.9, overflowX: "auto" }}>
                       <div style={{ color: "#fff", fontWeight: 700, marginBottom: 6 }}>Fini Crypto Battle Arena</div>
                       <div>Sign this message to verify wallet ownership and</div>
-                      <div>claim non-transferable Fini Coin for gameplay.</div>
+                      <div>claim non-transferable CUTE$ for gameplay.</div>
                       <br />
                       <div>Domain: fini.xyz</div>
                       <div>Wallet: {short}</div>
@@ -265,7 +265,7 @@ export function ClaimPage() {
                       <div style={{ color: "#68d391" }}>give permission to move any assets.</div>
                     </div>
                     <button onClick={handleSign} disabled={loading} style={{ ...pinkBtn, background: loading ? "#e5e7eb" : "#f472b6", color: loading ? "#aaa" : "#fff" }}>
-                      {loading ? "Verifying..." : "Sign & Claim FINI$"}
+                      {loading ? "Verifying..." : "Sign & Claim CUTE$"}
                     </button>
                     {claimError && (
                       <div style={{ fontSize: 13, color: "#dc2626", fontWeight: 700, padding: "10px 14px", background: "#fee2e2", border: "1.5px solid #fca5a5", borderRadius: 10 }}>
@@ -282,14 +282,14 @@ export function ClaimPage() {
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: "#111", marginBottom: 6 }}>Claim successful!</div>
                       <div style={{ fontSize: 14, color: "#666" }}>
-                        <strong style={{ color: "#f472b6" }}>{(claimResult?.amount ?? totalClaim).toLocaleString()} Fini Coin</strong> added to your balance
+                        <strong style={{ color: "#f472b6" }}>{(claimResult?.amount ?? totalClaim).toLocaleString()} CUTE$</strong> added to your balance
                       </div>
                     </div>
                     <div style={{ background: "#f9fafb", borderRadius: 14, padding: "14px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                      <MiniStat label="Fini Coin" value={(claimResult?.amount ?? totalClaim).toLocaleString() + " FINI$"} />
+                      <MiniStat label="CUTE$" value={(claimResult?.amount ?? totalClaim).toLocaleString() + " CUTE$"} />
                       <MiniStat label="Finis counted" value={String(finiCount)} />
                       <MiniStat label="Status" value="Claimed" />
-                      <MiniStat label="Daily grant" value={`${250 + finiCount * 50} FINI$/day`} />
+                      <MiniStat label="Daily grant" value={`${250 + finiCount * 50} CUTE$/day`} />
                     </div>
                     <a href="/crypto" style={{ ...pinkBtn, display: "block", textDecoration: "none", textAlign: "center" }}>
                       Enter the Arena →
@@ -304,7 +304,7 @@ export function ClaimPage() {
 
             {/* Legal notice */}
             <div style={{ marginTop: 12, padding: "14px 16px", borderRadius: 14, background: "#fef9c3", border: "1.5px solid #fde047", fontSize: 11, color: "#854d0e", lineHeight: 1.6 }}>
-              <strong>Game currency only.</strong> Fini Coin cannot be withdrawn, sold, transferred, or exchanged for money, crypto, NFTs, or anything of value. This is a game claim, not a token launch, airdrop, or investment.
+              <strong>Game currency only.</strong> CUTE$ cannot be withdrawn, sold, transferred, or exchanged for money, crypto, NFTs, or anything of value. This is a game claim, not a token launch, airdrop, or investment.
             </div>
           </div>
         </div>

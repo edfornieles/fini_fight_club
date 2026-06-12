@@ -74,12 +74,12 @@ export interface Strategy {
     velocityThreshold?: number;
   };
 
-  /** Capital per forecast, in FINI$. */
+  /** Capital per forecast, in CUTE$. */
   stake: number;
   /** Max forecasts per UTC day. */
   maxPerDay: number;
 
-  /** Budget pool (FINI$ allocated, remaining, saved profits). */
+  /** Budget pool (CUTE$ allocated, remaining, saved profits). */
   budget: StrategyBudget;
 
   /** Reinvest = compound back into budget. Save = profits go to savedProfits. */

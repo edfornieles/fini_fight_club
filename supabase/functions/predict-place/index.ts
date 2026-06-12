@@ -27,15 +27,22 @@ Deno.serve(async (req) => {
 
   const { battleId, side, idempotencyKey } = body;
   const stake = Math.round(Number(body.stake ?? 0));
-  const lockedPct = Math.round(Number(body.lockedPct ?? 0));
 
   if (!battleId)         return jsonResponse({ error: "missing_battle_id" }, 400);
   if (side !== "A" && side !== "B") return jsonResponse({ error: "invalid_side" }, 400);
   if (!Number.isFinite(stake) || stake <= 0) return jsonResponse({ error: "invalid_stake" }, 400);
-  if (lockedPct < 1 || lockedPct > 99) return jsonResponse({ error: "invalid_locked_pct" }, 400);
   if (!idempotencyKey)   return jsonResponse({ error: "missing_idempotency_key" }, 400);
 
   const sb = supabaseAdmin();
+
+  // 0. Light per-wallet velocity cap — block spam/abuse (house bots insert
+  //    directly and bypass this). 30 predictions / 60s is far above human play.
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const { count: recentCount } = await sb.from("predictions")
+    .select("id", { count: "exact", head: true })
+    .eq("wallet_address", wallet)
+    .gte("created_at", since);
+  if ((recentCount ?? 0) >= 30) return jsonResponse({ error: "rate_limited" }, 429);
 
   // 1. Battle must be open + not past cutoff
   const { data: battle, error: bErr } = await sb.from("battle_instances")
@@ -45,6 +52,22 @@ Deno.serve(async (req) => {
   if (new Date(battle.entry_cutoff).getTime() < Date.now()) {
     return jsonResponse({ error: "past_entry_cutoff" }, 409);
   }
+
+  // 1b. Lock the odds SERVER-SIDE from the live pool. Fixed-odds settlement
+  //     pays stake × 100/locked_pct, so this value is money — the client's
+  //     copy is ignored (a forged lockedPct:1 would otherwise pay 100×).
+  //     Same 5..95 band the arena displays; empty pool opens at 50/50.
+  const { data: poolRows } = await sb.from("predictions")
+    .select("side, stake").eq("battle_id", battleId).eq("status", "open");
+  let poolA = 0, poolB = 0;
+  for (const p of poolRows ?? []) {
+    if (p.side === "A") poolA += Number(p.stake) || 0; else poolB += Number(p.stake) || 0;
+  }
+  const poolTotal = poolA + poolB;
+  const sidePool = side === "A" ? poolA : poolB;
+  const lockedPct = poolTotal > 0
+    ? Math.min(95, Math.max(5, Math.round((sidePool / poolTotal) * 100)))
+    : 50;
 
   // 2. Debit stake atomically
   const { error: dErr } = await sb.rpc("debit_balance", {
@@ -78,5 +101,6 @@ Deno.serve(async (req) => {
   // 4. Bump battle volume atomically
   await sb.rpc("bump_battle_volume", { p_battle_id: battleId, p_amount: stake });
 
-  return jsonResponse({ success: true, battleId, side, stake });
+  // Echo the server-locked odds so the client can display the true figure.
+  return jsonResponse({ success: true, battleId, side, stake, lockedPct });
 });

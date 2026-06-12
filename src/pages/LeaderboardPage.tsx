@@ -9,7 +9,7 @@ const S = { fontFamily: "'Nunito', system-ui, sans-serif" };
 // In production these come from server views. Today they're seeded so the page
 // has visible content; structure mirrors what the real queries will return.
 
-// 1. Crypto Arena — top players ranked by net FINI$ won across prediction battles.
+// 1. Crypto Arena — top players ranked by net CUTE$ won across prediction battles.
 const CRYPTO_ARENA_TOP_PLAYERS = [
   { rank: 1, name: "samspike",     wallet: "0x18ce6cd5c283dca2f50c8347420607a4e59716a6", netFini: 84_230, totalPredictions: 412, winRate: 0.62 },
   { rank: 2, name: "jorgelopez",   wallet: "0x6266dbb2d202d4e246ee86d76bb2fbb9a71eafcd", netFini: 61_540, totalPredictions: 328, winRate: 0.59 },
@@ -106,7 +106,7 @@ export function LeaderboardPage() {
           number={1}
           icon="🎯"
           title="Crypto Arena Champions"
-          subtitle={(arenaLadder === "profit" ? "Ranked by net FINI$ won — being right pays" : "Ranked by total FINI$ staked — the most active traders") + " · sample data"}
+          subtitle={(arenaLadder === "profit" ? "Ranked by net CUTE$ won — being right pays" : "Ranked by total CUTE$ staked — the most active traders") + " · sample data"}
           accent="#f472b6"
         >
           {/* Profit vs Volume ladder toggle */}
@@ -209,11 +209,11 @@ function PlayerRow({ player, ladder }: { player: typeof CRYPTO_ARENA_TOP_PLAYERS
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         {ladder === "profit" ? (
           <div style={{ fontSize: 15, fontWeight: 900, color: "#16a34a" }}>
-            +{player.netFini.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>FINI$</span>
+            +{player.netFini.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>CUTE$</span>
           </div>
         ) : (
           <div style={{ fontSize: 15, fontWeight: 900, color: "#854d0e" }}>
-            {player.volume.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>FINI$ vol</span>
+            {player.volume.toLocaleString()} <span style={{ fontSize: 10, color: "#888", fontWeight: 600 }}>CUTE$ vol</span>
           </div>
         )}
         <div style={{ fontSize: 10, color: "#aaa" }}>

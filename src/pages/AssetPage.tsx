@@ -85,7 +85,7 @@ export function AssetPage() {
                   </span>
                 } />
               )}
-              <StatBox label="24hr Vol" value={`${totalVol}K`} sub="Fini Coin" />
+              <StatBox label="24hr Vol" value={`${totalVol}K`} sub="CUTE$" />
               <StatBox label="Live Battles" value={String(liveBattles.length)} sub={`of ${battles.length} total`} />
             </div>
           </div>
@@ -175,7 +175,7 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub: Rea
 function Disclaimer() {
   return (
     <div style={{ marginTop: 40, padding: "16px 20px", borderRadius: 12, background: "#f3f4f6", fontSize: 11, color: "#9ca3af", lineHeight: 1.6 }}>
-      🪙 Fini Coin is a non-transferable game currency with no real-world value. This is a game, not financial advice. Live crypto prices are fetched from CoinGecko and may be delayed. Do not use this site as a trading tool.
+      🪙 CUTE$ is a non-transferable game currency with no real-world value. This is a game, not financial advice. Live crypto prices are fetched from CoinGecko and may be delayed. Do not use this site as a trading tool.
     </div>
   );
 }

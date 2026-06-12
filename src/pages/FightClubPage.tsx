@@ -309,7 +309,7 @@ export function FightClubPage() {
     );
     if (actualPayout > 0) earn(actualPayout);
     if (cappedAt) {
-      console.warn(`[treasury] daily cap hit (${cappedAt} FINI$/day). Payout capped from ${intendedPayout} to ${actualPayout}.`);
+      console.warn(`[treasury] daily cap hit (${cappedAt} CUTE$/day). Payout capped from ${intendedPayout} to ${actualPayout}.`);
     }
 
     // Drip Crumbs after every battle. Outcome-dependent: win=8, loss=3, draw=avg.
@@ -461,7 +461,7 @@ function RunStatusModal({ balance, onRestart }: { balance: number; onRestart: ()
           Your run busted
         </div>
         <div style={{ fontSize: 14, color: "#555", lineHeight: 1.5, marginBottom: 20 }}>
-          You're down to <b>{balance.toLocaleString()} FINI$</b> — not enough to enter another battle.
+          You're down to <b>{balance.toLocaleString()} CUTE$</b> — not enough to enter another battle.
           Your Finis remember every battle, but a fresh run gives them a clean slate.
         </div>
         <button onClick={onRestart} style={{
@@ -527,7 +527,7 @@ function WorkshopView({
 
   function buyPotion(id: PotionId) {
     const p = POTIONS[id];
-    // Pay in Crumbs, not FINI$
+    // Pay in Crumbs, not CUTE$
     if (!useCrumbStore.getState().spend(p.price)) return;
     addPotion(id);
   }
@@ -568,7 +568,7 @@ function WorkshopView({
               <div style={{ fontSize: 18, fontWeight: 900, color: "#111" }}>
                 {stake} <span style={{ fontSize: 12, color: "#aaa" }}>→</span> {" "}
                 <span style={{ color: "#16a34a" }}>{stake * 2}</span>
-                <span style={{ fontSize: 13, color: "#854d0e" }}> FINI$</span>
+                <span style={{ fontSize: 13, color: "#854d0e" }}> CUTE$</span>
               </div>
               <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>Winnings paid by the Fini Treasury (beta)</div>
             </div>
@@ -614,7 +614,7 @@ function WorkshopView({
         {opponent.length > 0 && oppPower && (
           <Card
             title="🎯 Opponent Found"
-            subtitle={`Player ${opponentName} · matched within ±15% power · staking ${stake} FINI$`}
+            subtitle={`Player ${opponentName} · matched within ±15% power · staking ${stake} CUTE$`}
             accent="#f472b6"
             headerExtra={
               <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "right" }}>
@@ -824,7 +824,7 @@ function WorkshopView({
 
           {/* Shop row */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Shop — buy with FINI$</div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Shop — buy with CUTE$</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
               {(Object.keys(POTIONS) as PotionId[]).map(id => {
                 const p = POTIONS[id];
@@ -1475,7 +1475,7 @@ function ResultView({ winner, stake, opponentName, opponentTeamIds, onReturn }: 
     : null;
   function tweetResult() {
     const verb = isWin ? "Just beat" : isDraw ? "Drew with" : "Just lost to";
-    const text = `⚔️ ${verb} ${opponentName} in Fini Fight Club!\n${isWin ? `+${stake} FINI$ 💸` : isDraw ? "Honors even." : `-${stake} FINI$ — running it back.`}\n${window.location.origin}/fight-club`;
+    const text = `⚔️ ${verb} ${opponentName} in Fini Fight Club!\n${isWin ? `+${stake} CUTE$ 💸` : isDraw ? "Honors even." : `-${stake} CUTE$ — running it back.`}\n${window.location.origin}/fight-club`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank");
   }
   return (
@@ -1500,22 +1500,22 @@ function ResultView({ winner, stake, opponentName, opponentTeamIds, onReturn }: 
         {isWin && (
           <>
             <div style={{ height: 1, background: "#f0f0f0", margin: "8px 0" }} />
-            <Row label="Prize pot won"   value={`+${stake * 2} FINI$`}           color="#16a34a" bold />
-            <Row label="Net profit"      value={`+${stake} FINI$`}               color="#16a34a" />
+            <Row label="Prize pot won"   value={`+${stake * 2} CUTE$`}           color="#16a34a" bold />
+            <Row label="Net profit"      value={`+${stake} CUTE$`}               color="#16a34a" />
           </>
         )}
         {isDraw && (
           <>
             <div style={{ height: 1, background: "#f0f0f0", margin: "8px 0" }} />
-            <Row label="Stake refund"    value={`+${stake} FINI$`}               color="#888" bold />
-            <Row label="Net"             value={`0 FINI$`}                       color="#888" />
+            <Row label="Stake refund"    value={`+${stake} CUTE$`}               color="#888" bold />
+            <Row label="Net"             value={`0 CUTE$`}                       color="#888" />
           </>
         )}
         {winner === "them" && (
           <>
             <div style={{ height: 1, background: "#f0f0f0", margin: "8px 0" }} />
-            <Row label="Net loss"        value={`-${stake} FINI$`}               color="#dc2626" bold />
-            <div style={{ fontSize: 10, color: "#aaa", marginTop: 6, fontStyle: "italic" }}>Your {stake} FINI$ went to {/* opponent */} the winner.</div>
+            <Row label="Net loss"        value={`-${stake} CUTE$`}               color="#dc2626" bold />
+            <div style={{ fontSize: 10, color: "#aaa", marginTop: 6, fontStyle: "italic" }}>Your {stake} CUTE$ went to {/* opponent */} the winner.</div>
           </>
         )}
       </div>

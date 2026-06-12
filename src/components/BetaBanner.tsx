@@ -36,7 +36,7 @@ export function BetaBanner() {
     }}>
       <span style={{ fontSize: 14 }}>🚧</span>
       <span>
-        <b>Closed beta.</b> No real money — everything's FINI$ game tokens.
+        <b>Closed beta.</b> No real money — everything's CUTE$ game tokens.
         Found a bug or have an idea?{" "}
         <a href="mailto:ed@finiliar.com" style={{ color: "#fde047", textDecoration: "underline" }}>
           ed@finiliar.com

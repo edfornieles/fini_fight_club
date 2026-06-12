@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import { useMyEntries, positionValue, type MyEntry } from "../state/myEntriesStore";
 import { useCoinStore } from "../state/coinStore";
 import { useSimBattles } from "../data/cryptoSim";
+import { isOnline } from "../lib/supabase";
 
 type Tab = "open" | "activity" | "history";
 
@@ -101,7 +102,7 @@ export function ActivityHub() {
             fontSize: 38, fontWeight: 900, fontFamily: "monospace",
             color: stats.totalPL > 0 ? "#16a34a" : stats.totalPL < 0 ? "#dc2626" : "#666",
           }}>
-            {stats.totalPL >= 0 ? "+" : ""}{stats.totalPL.toLocaleString()} <span style={{ fontSize: 16, opacity: 0.7 }}>FINI$</span>
+            {stats.totalPL >= 0 ? "+" : ""}{stats.totalPL.toLocaleString()} <span style={{ fontSize: 16, opacity: 0.7 }}>CUTE$</span>
           </div>
           <div style={{ fontSize: 12, color: "#999", fontWeight: 600 }}>
             {stats.realisedPL >= 0 ? "+" : ""}{stats.realisedPL.toLocaleString()} realised · {stats.unrealisedPL >= 0 ? "+" : ""}{stats.unrealisedPL.toLocaleString()} unrealised
@@ -109,8 +110,8 @@ export function ActivityHub() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-          <Stat label="Open positions" value={stats.openCount.toLocaleString()} sub={`${stats.openValue.toLocaleString()} FINI$ at risk`} />
-          <Stat label="Volume staked" value={stats.staked.toLocaleString()} sub="all-time FINI$" />
+          <Stat label="Open positions" value={stats.openCount.toLocaleString()} sub={`${stats.openValue.toLocaleString()} CUTE$ at risk`} />
+          <Stat label="Volume staked" value={stats.staked.toLocaleString()} sub="all-time CUTE$" />
           <Stat label="Battles bet on" value={stats.battles.toLocaleString()} sub={`${stats.settled} settled`} />
           <Stat label="Win rate" value={stats.winRate == null ? "—" : `${stats.winRate}%`} sub={`${stats.wins}W · ${stats.losses}L · ${stats.voided}V · ${stats.sold}S`} />
         </div>
@@ -176,7 +177,10 @@ function OpenPositionsTable({
               </span>
             </Cell>
             <Cell flex={0.8} align="right">
-              <button onClick={() => onSell(e)} style={sellBtn}>Sell</button>
+              {/* Sell-early is offline/dev only — the server has no early-exit
+                  primitive, so a local earn() would mint phantom CUTE$ that the
+                  next server refresh silently wipes. */}
+              {!isOnline && <button onClick={() => onSell(e)} style={sellBtn}>Sell</button>}
             </Cell>
           </Row>
         );

@@ -47,7 +47,7 @@ export function SiteNav() {
         <NavLink to="/crypto" dot="#60a5fa" label="Crypto Arena" />
         <NavLink to="/fight-club" dot="#4ade80" label="Fight Club" />
         <NavLink to="/leaderboard" dot="#f97316" label="Leaderboard" />
-        <NavLink to="/claim" dot="#a78bfa" label="Claim FINI$" />
+        <NavLink to="/claim" dot="#a78bfa" label="Claim CUTE$" />
       </div>
 
       {/* Wallet + balance */}
@@ -77,7 +77,7 @@ export function SiteNav() {
                 {[
                   { icon: "👤", label: "Profile",        action: () => { setWalletDropdown(false); navigate("/profile"); } },
                   { icon: "🐾", label: "My Stable",      action: () => { setWalletDropdown(false); navigate("/account"); } },
-                  { icon: "🪙", label: "Claim Fini Coin",action: () => { setWalletDropdown(false); navigate("/claim"); } },
+                  { icon: "🪙", label: "Claim CUTE$",action: () => { setWalletDropdown(false); navigate("/claim"); } },
                   { icon: "→",  label: "Logout",         action: logout },
                 ].map(({ icon, label, action }) => (
                   <button key={label} onClick={action} style={{

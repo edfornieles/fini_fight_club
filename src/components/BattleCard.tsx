@@ -180,7 +180,7 @@ export function BattleCard({ battle }: { battle: Battle }) {
           </div>
         </div>
 
-        {/* Side buttons — show the projected payout for a 100 FINI$ stake so
+        {/* Side buttons — show the projected payout for a 100 CUTE$ stake so
             the player sees the value of each side without doing the math. */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
           {[

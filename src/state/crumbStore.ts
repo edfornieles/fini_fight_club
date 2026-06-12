@@ -1,17 +1,17 @@
 /**
  * Crumbs 🍪 — the in-battle currency.
  *
- * Distinct from FINI$ (which is the entry stake + prize for battles).
+ * Distinct from CUTE$ (which is the entry stake + prize for battles).
  * Crumbs pay for items, potions, snacks, shop rerolls — the small-stakes
  * tactical decisions a player makes between fights.
  *
  * Why two currencies?
- *   FINI$  → the bankroll. Used to enter battles, won as prizes, cashed out
+ *   CUTE$  → the bankroll. Used to enter battles, won as prizes, cashed out
  *             to real money at the cashout tier.
  *   Crumbs → the per-run economy. Replenished automatically (1 battle = +20
  *             crumbs), reset on bust/restart. Skill at managing crumbs
  *             determines whether you can afford the right items at the right
- *             moment without dipping into your FINI$ bankroll.
+ *             moment without dipping into your CUTE$ bankroll.
  *
  * Persisted to localStorage; reset by useFiniRecords.reset() callers.
  */

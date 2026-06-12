@@ -87,6 +87,21 @@ async function verifySignature(req: Request): Promise<Response> {
   await sb.from("wallet_signatures").update({ used_at: new Date().toISOString(), signature: body.signature })
     .eq("id", sigRow.id);
 
+  // ── Invite gate ────────────────────────────────────────────────────────────
+  // When open beta is OFF, only allowlisted wallets (or admins) may sign in.
+  // Default is open; the operator flips economy_config.open_beta to lock down.
+  const { data: cfg } = await sb.from("economy_config").select("open_beta").eq("id", 1).maybeSingle();
+  if (cfg && cfg.open_beta === false) {
+    const [{ data: allowed }, { data: usr }] = await Promise.all([
+      sb.from("beta_allowlist").select("wallet_address").eq("wallet_address", wallet).maybeSingle(),
+      sb.from("users").select("is_admin").eq("wallet_address", wallet).maybeSingle(),
+    ]);
+    const envAdmins = (Deno.env.get("ADMIN_WALLETS") ?? "").split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
+    if (!allowed && !usr?.is_admin && !envAdmins.includes(wallet)) {
+      return jsonResponse({ error: "not_invited" }, 403);
+    }
+  }
+
   // Create or fetch the user
   const email = `${wallet}@wallet.local`;
   let userId: string;

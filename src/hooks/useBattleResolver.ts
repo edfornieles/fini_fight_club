@@ -7,7 +7,7 @@
  *   2. Determine the winning side from current odds (live-price-driven for
  *      Up/Down + Outperform, seed-driven for others)
  *   3. Call useMyEntries.resolveEntry → marks the entry settled
- *   4. Credit the player's FINI$ via useCoinStore.earn (winners + voids only)
+ *   4. Credit the player's CUTE$ via useCoinStore.earn (winners + voids only)
  *   5. Push a celebratory/condolence notification to useNotifications
  *
  * Mounted globally from <App /> so settlement happens regardless of which
@@ -21,6 +21,8 @@ import { useNotifications } from "../state/notificationsStore";
 import { useStrategies } from "../state/strategiesStore";
 import { intraWindowReturn, openingFor } from "../lib/openingPrices";
 import { getCachedPrices } from "../lib/priceProviders";
+import { isOnline } from "../lib/supabase";
+import { fetchMyPredictions, fetchBattleResults } from "../data/arenaServer";
 
 interface BattleForResolve {
   id: string;
@@ -97,10 +99,71 @@ function resolveBattle(battle: BattleForResolve): ResolveOutcome {
 
 export function useBattleResolver() {
   useEffect(() => {
-    // Make sure the crypto-sim is running globally so the resolver always has
-    // up-to-date battle state to read winning odds from. start() is idempotent.
+    // Boot the arena store (server-mirror when online, sim offline). Idempotent.
     useCryptoSim.getState().start();
 
+    // ── Online: settle from SERVER truth ─────────────────────────────────────
+    // Manual bets settle from the player's own server prediction (pari-mutuel
+    // payout). Strategy (Automated Attack) entries keep their segregated local
+    // budget but resolve on the real battle winning side, not a cached-price
+    // guess. Balance is always refreshed from the server (authoritative).
+    if (isOnline) {
+      let stopped = false;
+      async function settleOnline() {
+        const w = useMyEntries.getState().activeWallet;
+        const entries = useMyEntries.getState().entries;
+        const due = entries.filter(e => e.status === "open" && e.endsAt <= Date.now() + 2000);
+        if (due.length === 0) return;
+        const pushNotif = useNotifications.getState().push;
+        const manual = due.filter(e => !e.strategyId);
+        const strat = due.filter(e => e.strategyId);
+
+        // Manual bets → player's server prediction status + payout.
+        if (manual.length && w) {
+          try {
+            const preds = await fetchMyPredictions(w, manual.map(e => e.battleId));
+            let settledAny = false;
+            for (const e of manual) {
+              const sp = preds.get(e.battleId);
+              if (!sp || (sp.status !== "resolved" && sp.status !== "voided")) continue;
+              const settled = useMyEntries.getState().settleServer(e.battleId, sp.status, Number(sp.payout ?? 0));
+              if (!settled || !settled.result) continue;
+              settledAny = true;
+              if (settled.status === "won") {
+                pushNotif({ tone: "win", icon: "🎉", title: `You won ${settled.result.payout.toLocaleString()} CUTE$!`, body: `${e.battleTitle} — ${e.sideLabel} carried the day. Net +${settled.result.netProfit.toLocaleString()} CUTE$.`, href: `/battle/${e.battleId}`, durationMs: 12_000 });
+              } else if (settled.status === "lost") {
+                pushNotif({ tone: "loss", icon: "💀", title: `Lost ${e.stake} CUTE$`, body: `${e.battleTitle} — ${e.sideLabel} didn't carry. Tough break.`, href: `/battle/${e.battleId}`, durationMs: 8_000 });
+              } else if (settled.status === "voided") {
+                pushNotif({ tone: "info", icon: "↩️", title: `Battle voided — ${e.stake} CUTE$ refunded`, body: `${e.battleTitle} — too close to call, stake returned.`, href: `/battle/${e.battleId}`, durationMs: 8_000 });
+              }
+            }
+            if (settledAny) void useCoinStore.getState().refresh(w);
+          } catch { /* retry next tick */ }
+        }
+
+        // Strategy entries → real battle outcome, settled into the strategy budget.
+        if (strat.length) {
+          try {
+            const results = await fetchBattleResults(strat.map(e => e.battleId));
+            for (const e of strat) {
+              const r = results.get(e.battleId);
+              if (!r || !r.settled) continue;
+              const settled = useMyEntries.getState().resolveEntry(e.battleId, r.winningSide);
+              if (!settled || !settled.result) continue;
+              const kind = settled.status === "won" ? "win" : settled.status === "lost" ? "loss" : "voided";
+              useStrategies.getState().recordOutcome(e.strategyId!, kind, e.stake, settled.result.payout);
+            }
+          } catch { /* retry next tick */ }
+        }
+
+        useMyEntries.getState().pruneSettled(5 * 60 * 1000);
+      }
+      void settleOnline();
+      const t = setInterval(() => { if (!stopped) void settleOnline(); }, 3000);
+      return () => { stopped = true; clearInterval(t); };
+    }
+
+    // ── Offline / dev fallback: settle locally against cached prices ──────────
     function check() {
       const now = Date.now();
       const entries = useMyEntries.getState().entries;
@@ -156,8 +219,8 @@ export function useBattleResolver() {
           pushNotif({
             tone: "win",
             icon: "🎉",
-            title: `You won ${settled.result.payout.toLocaleString()} FINI$!`,
-            body: `${entry.battleTitle} — ${entry.sideLabel} carried the day. Net +${settled.result.netProfit.toLocaleString()} FINI$.${auditLine ? `\n${auditLine}` : ""}`,
+            title: `You won ${settled.result.payout.toLocaleString()} CUTE$!`,
+            body: `${entry.battleTitle} — ${entry.sideLabel} carried the day. Net +${settled.result.netProfit.toLocaleString()} CUTE$.${auditLine ? `\n${auditLine}` : ""}`,
             href: `/battle/${entry.battleId}`,
             durationMs: 12_000,
           });
@@ -165,7 +228,7 @@ export function useBattleResolver() {
           pushNotif({
             tone: "loss",
             icon: "💀",
-            title: `Lost ${entry.stake} FINI$`,
+            title: `Lost ${entry.stake} CUTE$`,
             body: `${entry.battleTitle} — ${entry.sideLabel} didn't carry.${auditLine ? `\n${auditLine}` : " Tough break."}`,
             href: `/battle/${entry.battleId}`,
             durationMs: 8_000,
@@ -174,7 +237,7 @@ export function useBattleResolver() {
           pushNotif({
             tone: "info",
             icon: "↩️",
-            title: `Battle voided — ${entry.stake} FINI$ refunded`,
+            title: `Battle voided — ${entry.stake} CUTE$ refunded`,
             body: `${entry.battleTitle} — too close to call, stake back in your bankroll.${auditLine ? `\n${auditLine}` : ""}`,
             href: `/battle/${entry.battleId}`,
             durationMs: 8_000,

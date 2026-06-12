@@ -63,40 +63,74 @@ async function run(env) {
 
 const SVC = (env) => ({ "apikey": env.SUPABASE_SERVICE_ROLE_KEY, "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" });
 
+// How many new bot bets to add to each open battle per tick, and the odds band
+// the book is kept inside so no battle ever shows 0%/100% (which reads as broken,
+// not Polymarket-like). Tune these to dial arena liveliness.
+const MAKERS_PER_BATTLE = 5;
+const MIN_PCT = 8, MAX_PCT = 92;
+
 async function runHouseBots(env) {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = env;
   if (!SUPABASE_SERVICE_ROLE_KEY) { console.log("[house-bots] no service key — skipped"); return; }
   const h = SVC(env);
 
-  // Load active bots + currently-open battles
-  const [botsRes, battlesRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/house_bots?active=eq.true&select=wallet_address,handle,strategy_type,params,stake&limit=50`, { headers: h }),
-    fetch(`${SUPABASE_URL}/rest/v1/battle_instances?status=eq.open&select=id,asset_a,asset_b,official_start_price_a,official_start_price_b&limit=40`, { headers: h }),
+  // Operator kill switch: economy_config.bots_paused halts all bot play.
+  try {
+    const cfgRes = await fetch(`${SUPABASE_URL}/rest/v1/economy_config?id=eq.1&select=bots_paused`, { headers: h });
+    const cfg = await cfgRes.json();
+    if (Array.isArray(cfg) && cfg[0]?.bots_paused === true) {
+      console.log("[house-bots] paused via economy_config — skipped");
+      return;
+    }
+  } catch (e) { /* config unreadable → default to running */ }
+
+  // Active bots, open battles, and all open predictions (to know current pools
+  // + which bot is already in which battle).
+  const [botsRes, battlesRes, predRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/house_bots?active=eq.true&select=wallet_address,handle,strategy_type,params,stake&limit=200`, { headers: h }),
+    fetch(`${SUPABASE_URL}/rest/v1/battle_instances?status=eq.open&select=id,asset_a,asset_b,end_time&limit=60`, { headers: h }),
+    fetch(`${SUPABASE_URL}/rest/v1/predictions?status=eq.open&select=battle_id,wallet_address,side,stake&limit=5000`, { headers: h }),
   ]);
   const bots = await botsRes.json();
   const battles = await battlesRes.json();
+  const preds = await predRes.json();
   if (!Array.isArray(bots) || !Array.isArray(battles) || battles.length === 0) return;
 
-  // Existing open predictions, to avoid a bot doubling up on a battle
-  const predRes = await fetch(`${SUPABASE_URL}/rest/v1/predictions?status=eq.open&select=battle_id,wallet_address&limit=1000`, { headers: h });
-  const preds = await predRes.json();
-  const taken = new Set((Array.isArray(preds) ? preds : []).map(p => `${p.wallet_address}:${p.battle_id}`));
+  // Current pool per battle + bot membership.
+  const pool = new Map();      // battleId -> { A, B }
+  const inBattle = new Set();  // `${wallet}:${battleId}`
+  for (const p of (Array.isArray(preds) ? preds : [])) {
+    const e = pool.get(p.battle_id) || { A: 0, B: 0 };
+    e[p.side === "A" ? "A" : "B"] += (p.stake || 0);
+    pool.set(p.battle_id, e);
+    inBattle.add(`${p.wallet_address}:${p.battle_id}`);
+  }
 
   let placed = 0;
-  for (const bot of bots) {
-    // Each bot acts on up to 6 battles per tick. Was 2 — too low: with only
-    // 8 open battles available the bots filled their candidates in 2 ticks
-    // then sat idle for hours waiting for resolutions. 6 gets them through
-    // the full candidate list per tick when capacity exists.
-    let actsLeft = 6;
-    for (const battle of battles) {
-      if (actsLeft <= 0) break;
-      if (taken.has(`${bot.wallet_address}:${battle.id}`)) continue;
-      const side = decideSide(bot, battle);
-      if (!side) continue;
+  // Battle-centric: seed every open battle with balanced two-sided depth so the
+  // odds are always live and within band — never one-sided.
+  for (const battle of shuffle(battles)) {
+    const e = pool.get(battle.id) || { A: 0, B: 0 };
+    const cands = shuffle(bots.filter(b =>
+      !inBattle.has(`${b.wallet_address}:${battle.id}`) && botAllows(b, battle)));
+    let ci = 0;
+    for (let m = 0; m < MAKERS_PER_BATTLE && ci < cands.length; m++) {
+      const bot = cands[ci++];
+      // 70% of bets balance the book (push the lighter side); 30% follow the
+      // bot's strategy lean — keeps depth two-sided but not mechanical.
+      const lighter = e.A <= e.B ? "A" : "B";
+      const lean = strategySide(bot);
+      const side = (Math.random() < 0.7 || !lean) ? lighter : lean;
 
-      // Debit the bot's balance, then record the prediction (service role).
-      const stake = bot.stake || 100;
+      // locked_pct = the side's live implied probability BEFORE this bet
+      // (Polymarket-style: you take the price that's on the board now).
+      const total = e.A + e.B;
+      const sidePool = side === "A" ? e.A : e.B;
+      const lockedPct = total > 0
+        ? Math.min(MAX_PCT, Math.max(MIN_PCT, Math.round((sidePool / total) * 100)))
+        : 50;
+      const stake = variedStake();
+
       const idem = `housebot:${bot.wallet_address}:${battle.id}`;
       const debit = await fetch(`${SUPABASE_URL}/rest/v1/rpc/debit_balance`, {
         method: "POST", headers: h,
@@ -106,42 +140,72 @@ async function runHouseBots(env) {
 
       const ins = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
         method: "POST", headers: { ...h, "Prefer": "resolution=ignore-duplicates" },
-        body: JSON.stringify({ battle_id: battle.id, wallet_address: bot.wallet_address, side, stake, locked_pct: 50, idempotency_key: idem }),
+        body: JSON.stringify({ battle_id: battle.id, wallet_address: bot.wallet_address, side, stake, locked_pct: lockedPct, idempotency_key: idem }),
       });
-      if (ins.ok) { placed++; actsLeft--; taken.add(`${bot.wallet_address}:${battle.id}`); }
+      if (ins.ok) {
+        placed++;
+        inBattle.add(`${bot.wallet_address}:${battle.id}`);
+        if (side === "A") e.A += stake; else e.B += stake;
+      } else if (new Date(battle.end_time).getTime() < Date.now() + 3 * 60_000) {
+        // Debit landed but the prediction insert failed, and the battle closes
+        // before the next tick can retry (debit idem no-op + insert) — without
+        // this the stake would be debited forever with no pooled bet. Refunding
+        // ONLY in the no-retry window means a later successful retry can never
+        // double-credit. Idempotent key: at most one refund per bot+battle.
+        await fetch(`${SUPABASE_URL}/rest/v1/rpc/credit_balance`, {
+          method: "POST", headers: h,
+          body: JSON.stringify({
+            p_wallet: bot.wallet_address, p_amount: stake, p_reason: "admin_grant",
+            p_idempotency_key: `housebot-refund:${bot.wallet_address}:${battle.id}`,
+            p_battle_id: battle.id, p_metadata: { kind: "bot_insert_failed_refund" },
+          }),
+        }).catch(() => { /* ledger reconciliation will catch it */ });
+      }
     }
+    pool.set(battle.id, e);
   }
-  console.log(`[house-bots] ${bots.length} active, placed ${placed} predictions`);
+  console.log(`[house-bots] ${bots.length} active, placed ${placed} two-sided predictions across ${battles.length} battles`);
 }
 
-/** Lightweight server-side mirror of the Automated Attack strategy logic. */
-function decideSide(bot, battle) {
+function shuffle(arr) {
+  return arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+}
+
+// Varied bet sizes — skewed toward small bets with the occasional whale, so
+// pools build realistic depth and odds form smooth distributions, not 100-unit steps.
+function variedStake() {
+  const r = Math.random();
+  const base = 50 + Math.floor(r * r * 450);                       // 50..~500, skewed small
+  const whale = Math.random() < 0.08 ? Math.floor(Math.random() * 1500) : 0; // ~8% big bets
+  return base + whale;
+}
+
+// Asset filter only (does the bot's mandate cover this battle's assets?).
+function botAllows(bot, battle) {
   const params = bot.params || {};
-  // Asset filter
   if (Array.isArray(params.assetFilter) && params.assetFilter.length) {
     const assets = [battle.asset_a, battle.asset_b].filter(Boolean);
-    if (!assets.some(a => params.assetFilter.includes(a))) return null;
+    return assets.some(a => params.assetFilter.includes(a));
   }
+  return true;
+}
+
+// The bot's directional lean (used for ~30% of its bets). null = no strong lean.
+function strategySide(bot) {
+  const params = bot.params || {};
   switch (bot.strategy_type) {
     case "loyalist":
     case "flat_bias":
       return params.sideFilter || "A";
     case "contrarian":
-      // Always fade the structurally-favoured side. The previous 50% random
-      // skip meant these bots were idle half the time for no good reason —
-      // contrarians should always bet the underdog when one exists.
       return "B";
     case "momentum":
     case "momentum_underlying":
-    case "late_sniper": {
-      // Use start price as a weak proxy: bots back "A" (Up / first asset) more
-      // often, with some entropy. Real edge comes from the client sim too;
-      // these keep the DB populated with rational, mostly-favoured picks.
+    case "late_sniper":
       return Math.random() < 0.62 ? "A" : "B";
-    }
     case "mean_reversion":
       return Math.random() < 0.5 ? "B" : "A";
     default:
-      return Math.random() < 0.5 ? "A" : null;
+      return null;
   }
 }

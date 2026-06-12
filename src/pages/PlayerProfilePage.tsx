@@ -122,7 +122,7 @@ export function PlayerProfilePage() {
                 textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8,
                 boxShadow: "0 4px 14px rgba(244,114,182,0.35)",
               }}>
-                ⚔️ Battle now (100 FINI$)
+                ⚔️ Battle now (100 CUTE$)
               </Link>
               <button onClick={copyChallengeLink} style={{
                 background: "#fff", color: "#111",

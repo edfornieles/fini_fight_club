@@ -19,6 +19,9 @@ import { useCryptoSim, useSimBattles, battleEndsAtMs } from "../data/cryptoSim";
 import { openingFor, intraWindowReturn } from "../lib/openingPrices";
 import { getCachedPrices } from "../lib/priceProviders";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { isOnline } from "../lib/supabase";
+import { fetchInstanceAudit } from "../data/arenaServer";
+import type { BattleInstance } from "../game/priceIntegrity";
 
 const S: React.CSSProperties = { fontFamily: "'Nunito', system-ui, sans-serif" };
 
@@ -27,6 +30,19 @@ const ASSET_COLORS: Record<string, string> = {
   LINK: "#2a5ada", UNI: "#ff007a", AVAX: "#e84142", BNB: "#f3ba2f",
   MATIC: "#8247e5", XTZ: "#a6e000",
 };
+
+/** Map a predict-place failure into a player-friendly message. */
+function friendlyPlaceError(e: unknown): string {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  if (msg.includes("unauthorized") || msg.includes("token") || msg.includes("401")) {
+    return "Connect your wallet to place a prediction.";
+  }
+  if (msg.includes("insufficient")) return "Not enough CUTE$ to place this prediction.";
+  if (msg.includes("cutoff") || msg.includes("closed")) return "This battle just closed — predictions are locked.";
+  if (msg.includes("not_found")) return "This battle is no longer available.";
+  if (msg.includes("offline")) return "You're offline — reconnect and try again.";
+  return "Couldn't place your prediction. Please try again.";
+}
 
 
 export function BattlePage() {
@@ -106,7 +122,7 @@ export function BattlePage() {
     const amount = Math.round(Number(stake));
     // Reject empty / zero / NaN stakes — a 0 bet was previously placeable.
     if (!Number.isFinite(amount) || amount < 1) {
-      setPredictResult({ ok: false, error: "Enter a stake of at least 1 FINI$." });
+      setPredictResult({ ok: false, error: "Enter a stake of at least 1 CUTE$." });
       setPredicting(false);
       return;
     }
@@ -119,19 +135,7 @@ export function BattlePage() {
     const lockedPct = selectedSide === "A" ? battle.sideA.pct : battle.sideB.pct;
     const idemKey = `predict:${battle.id}:${selectedSide}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
-    // Local-first: if the player can afford it, deduct FINI$ optimistically and
-    // show the success state. If the backend is wired up, server settlement
-    // will reconcile when the battle resolves. If offline (dev mode), this is
-    // the authoritative path.
-    const balance = useCoinStore.getState().balance;
-    if (balance < amount) {
-      setPredictResult({ ok: false, error: "Not enough FINI$ to place this prediction." });
-      setPredicting(false);
-      return;
-    }
-    useCoinStore.getState().spend(amount);
-
-    // Helper: parse "15m"/"1h"/"2h" → ms (kept local to avoid a new util import)
+    // Parse "15m"/"1h"/"2h" → ms (battle duration, for the progress bar).
     const parseDur = (label?: string) => {
       if (!label) return battle!.endsInMs;
       const m = /^(\d+)(m|h)$/.exec(label.trim());
@@ -139,41 +143,60 @@ export function BattlePage() {
       const n = Number(m[1]);
       return m[2] === "h" ? n * 3_600_000 : n * 60_000;
     };
-    // Persist the entry locally so My Active Battles shows up on /crypto + survives reload.
-    const persistEntry = (side: "A" | "B", stake: number) => {
+    // Record the entry locally for "My Active Battles" (a display mirror — when
+    // online the server balance + settlement are authoritative). Re-point the
+    // entries store at the active wallet first so it lands on the right list.
+    const persistEntry = (side: "A" | "B", stake: number, entryPct?: number) => {
+      if (walletAddress && useMyEntries.getState().activeWallet !== walletAddress.toLowerCase()) {
+        useMyEntries.getState().useWallet(walletAddress);
+      }
       useMyEntries.getState().add({
         battleId: battle.id,
         battleTitle: battle.title,
         side,
         sideLabel: side === "A" ? battle.sideA.label : battle.sideB.label,
         stake,
-        entryPct: side === "A" ? battle.sideA.pct : battle.sideB.pct,
+        entryPct: entryPct ?? (side === "A" ? battle.sideA.pct : battle.sideB.pct),
         endsAt: Date.now() + battle.endsInMs,
         durationMs: parseDur(battle.durationLabel),
       });
     };
-    // ── Play-money beta: predictions settle LOCALLY ──────────────────────────
-    // The backend (predict-place) requires a real SIWE session; dev-impersonated
-    // players don't have one, so calling it always 401s. During beta we settle
-    // locally — the FINI$ debit above + this entry + the resolver are the
-    // authoritative path. (The server call returns when real wallet auth ships.)
-    // Guard against a wallet-sync race: if the entries store is pointed at a
-    // different (or no) wallet, the optimistic FINI$ spend above would land but
-    // the entry would be dropped onto the wrong list. Re-point it first.
-    if (walletAddress && useMyEntries.getState().activeWallet !== walletAddress.toLowerCase()) {
-      useMyEntries.getState().useWallet(walletAddress);
+
+    // ── Online: SERVER-AUTHORITATIVE ─────────────────────────────────────────
+    // predict-place debits + records the prediction on the server (requires a
+    // SIWE session). Humans land in the SAME pool as the house bots. The odds
+    // are LOCKED SERVER-SIDE from the live pool (the client's lockedPct is
+    // advisory); we adopt the echoed figure so the local entry shows the same
+    // multiplier the server will actually pay. No optimistic local debit.
+    if (isOnline) {
+      let serverLocked: number | undefined;
+      try {
+        const r = await api.predictPlace({ battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey });
+        serverLocked = r.lockedPct;
+      } catch (e) {
+        setPredictResult({ ok: false, error: friendlyPlaceError(e) });
+        setPredicting(false);
+        return;
+      }
+      persistEntry(selectedSide, amount, serverLocked);
+      const wallet = useUIStore.getState().walletAddress;
+      if (wallet) await useCoinStore.getState().refresh(wallet);
+      setPredictResult({ ok: true, side: selectedSide, stake: amount });
+      setPredicting(false);
+      return;
     }
+
+    // ── Offline/dev fallback: settle LOCALLY ─────────────────────────────────
+    const balance = useCoinStore.getState().balance;
+    if (balance < amount) {
+      setPredictResult({ ok: false, error: "Not enough CUTE$ to place this prediction." });
+      setPredicting(false);
+      return;
+    }
+    useCoinStore.getState().spend(amount);
     persistEntry(selectedSide, amount);
     setPredictResult({ ok: true, side: selectedSide, stake: amount });
     setPredicting(false);
-    // Fire-and-forget server record if a real session ever exists. A 401/offline
-    // is expected in beta and silently ignored — local settlement already done.
-    void api.predictPlace({
-      battleId: battle.id, side: selectedSide, stake: amount, lockedPct, idempotencyKey: idemKey,
-    }).then(() => {
-      const wallet = useUIStore.getState().walletAddress;
-      if (wallet) useCoinStore.getState().refresh(wallet);
-    }).catch(() => { /* expected in beta */ });
   }
 
   // Hooks below must run on every render — declaring them after the `!battle`
@@ -185,6 +208,19 @@ export function BattlePage() {
     return () => clearInterval(t);
   }, []);
   const playerEntry = useMyEntries(s => s.entries.find(e => e.battleId === battle?.id));
+  // Real server audit for this battle (official prices, status, audit log).
+  // Polls so the panel flips from pending → resolved as the server settles.
+  const [serverAudit, setServerAudit] = useState<BattleInstance | null>(null);
+  useEffect(() => {
+    if (!battleId || !isOnline) { setServerAudit(null); return; }
+    let alive = true;
+    const pull = () => fetchInstanceAudit(battleId)
+      .then(a => { if (alive) setServerAudit(a); })
+      .catch(() => { /* keep last */ });
+    pull();
+    const t = setInterval(pull, 10_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [battleId]);
   const [realVolume, setRealVolume] = useState<number | null>(null);
   useEffect(() => {
     if (!battle) return;
@@ -207,6 +243,8 @@ export function BattlePage() {
   }
 
   const { sideA, sideB } = battle;
+  // Server truth first; the mock library only backs the offline/dev battles.
+  const instanceAudit = serverAudit ?? MOCK_INSTANCES[battle.id] ?? null;
   const primaryAsset = battle.assets[0];
   const color = ASSET_COLORS[primaryAsset] ?? "#f472b6";
   const meta = ASSET_META[primaryAsset];
@@ -323,7 +361,7 @@ export function BattlePage() {
                 battle={battle}
                 userBetSide={predictResult && predictResult.ok ? predictResult.side : null}
                 userPayout={useMyEntries.getState().entries.find(e => e.battleId === battle.id)?.result?.payout ?? null}
-                resolutionStatus={MOCK_INSTANCES[battle.id]?.resolutionStatus ?? null}
+                resolutionStatus={instanceAudit?.resolutionStatus ?? null}
               />
             )}
 
@@ -340,7 +378,7 @@ export function BattlePage() {
               sideBPct={sideB.pct}
               color={color}
               userBet={predictResult && predictResult.ok ? predictResult : null}
-              resolutionStatus={MOCK_INSTANCES[battle.id]?.resolutionStatus ?? null}
+              resolutionStatus={instanceAudit?.resolutionStatus ?? null}
             />
 
             {/* Live market data — % since open + price graph (Up/Down + Outperform only) */}
@@ -369,19 +407,19 @@ export function BattlePage() {
                   value={realVolume != null
                     ? realVolume >= 1000 ? `${Math.round(realVolume / 1000)}K` : `${realVolume}`
                     : "—"}
-                  sub="FINI$ wagered"
+                  sub="CUTE$ wagered"
                 />
                 <StatBox
                   label="Time Left"
                   value={
                     remainingMs > 0 ? fmtTime(remainingMs)
-                      : MOCK_INSTANCES[battle.id]?.resolutionStatus === "manual_review" ? "Hold"
-                      : MOCK_INSTANCES[battle.id]?.resolutionStatus === "voided" ? "Voided"
+                      : instanceAudit?.resolutionStatus === "manual_review" ? "Hold"
+                      : instanceAudit?.resolutionStatus === "voided" ? "Voided"
                       : "Settled"
                   }
                   sub={
                     remainingMs > 0 ? "until resolution"
-                      : MOCK_INSTANCES[battle.id]?.resolutionStatus === "manual_review" ? "awaiting oracle"
+                      : instanceAudit?.resolutionStatus === "manual_review" ? "awaiting oracle"
                       : "this round"
                   }
                 />
@@ -398,16 +436,16 @@ export function BattlePage() {
               <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Battle Rules</div>
               <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7, fontWeight: 500 }}>
                 <b>Price source.</b> Every price is the median of three feeds — CoinGecko, Coinbase, and Binance — so no single source can skew a result.<br />
-                <b>Winner.</b> Decided purely by the price move over the window (see the rule at the top of this page). Every battle resolves to a clear winner — there are no ties or voids.<br />
-                <b>Payout.</b> Winners are paid from the prize pool in proportion to the odds when they entered — back an underdog and you earn more; back a favourite and you earn less.<br />
-                <b>Sell anytime.</b> You can cash out a position before the battle ends at its current market value, to lock in a gain or cut a loss.<br />
-                <b>Play-money beta.</b> FINI$ is an in-game currency with no real-world value. Prices may be delayed; this is a game, not a trading tool.
+                <b>Winner.</b> Decided purely by the price move over the window (see the rule at the top of this page). If the feeds disagree or fail at close, the battle is voided and every stake is refunded — never guessed.<br />
+                <b>Payout.</b> Your odds lock the moment you enter: win and you're paid stake × 100 ÷ your side's % at entry — back a 40% underdog for 2.5×, a 70% favourite for ~1.4×. The "To win" figure shown when you bet is exactly what a win pays.<br />
+                {!isOnline && <><b>Sell anytime.</b> You can cash out a position before the battle ends at its current market value, to lock in a gain or cut a loss.<br /></>}
+                <b>Play-money beta.</b> CUTE$ is an in-game currency with no real-world value. Prices may be delayed; this is a game, not a trading tool.
               </div>
             </div>
 
             {/* Resolution audit panel — always visible, content depends on status */}
             {(() => {
-              const instance = MOCK_INSTANCES[battle.id];
+              const instance = instanceAudit;
               if (!instance) return null;
               return (
                 <div style={{ background: "#fff", borderRadius: 20, padding: "24px", border: "1.5px solid #f0f0f0" }}>
@@ -493,7 +531,7 @@ export function BattlePage() {
                   </div>
                   <div style={{ fontSize: 10, color: "#999", marginTop: 2, fontWeight: 700 }}>
                     {selectedSide
-                      ? `at ${selectedSide === "A" ? sideA.pct : sideB.pct}¢ / share · fee ~${fee} FINI$`
+                      ? `at ${selectedSide === "A" ? sideA.pct : sideB.pct}¢ / share · fee ~${fee} CUTE$`
                       : "Pick a side to see your payout"}
                   </div>
                 </div>
@@ -505,7 +543,7 @@ export function BattlePage() {
                   {selectedSide
                     ? Math.round(Number(stake) * (selectedSide === "A" ? 100 / sideA.pct : 100 / sideB.pct)).toLocaleString()
                     : "—"}
-                  <span style={{ fontSize: 13, opacity: 0.7, marginLeft: 4 }}>FINI$</span>
+                  <span style={{ fontSize: 13, opacity: 0.7, marginLeft: 4 }}>CUTE$</span>
                 </div>
               </div>
 
@@ -529,7 +567,7 @@ export function BattlePage() {
                         }}
                       >
                         <span style={{ fontSize: 18 }}>🔒</span>
-                        Entry locked — {predictResult.stake} FINI$ on {predictResult.side === "A" ? sideA.label : sideB.label}
+                        Entry locked — {predictResult.stake} CUTE$ on {predictResult.side === "A" ? sideA.label : sideB.label}
                       </button>
                       <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "#fff", border: "1.5px solid #f0f0f0", fontSize: 12, color: "#666", fontWeight: 600, lineHeight: 1.5, textAlign: "center" }}>
                         Entry placed. The outcome settles when the battle's resolution timer hits zero — sit tight.
@@ -603,7 +641,7 @@ export function BattlePage() {
               )}
 
               <div style={{ fontSize: 11, color: "#bbb", textAlign: "center", lineHeight: 1.5 }}>
-                Fini Coin is a non-transferable in-game currency. No real-world value.
+                CUTE$ is a non-transferable in-game currency. No real-world value.
               </div>
             </div>
 
@@ -660,7 +698,7 @@ function SideBtn({ label, pct, selected, color, bg, onSelect }: {
   label: string; pct: number; side: string; selected: boolean; color: string; bg: string; onSelect: () => void;
 }) {
   // pct is the implied probability — equivalent to a share price in cents
-  // out of 100. A 54% side costs ~54¢ per FINI$ of potential payout.
+  // out of 100. A 54% side costs ~54¢ per CUTE$ of potential payout.
   return (
     <button onClick={onSelect} style={{
       padding: "16px 10px", borderRadius: 14,
@@ -690,7 +728,7 @@ function BalanceDisplay() {
     }}>
       <span style={{ fontSize: 13 }}>🪙</span>
       <span>{fmtCoin(balance, { compact: true })}</span>
-      <span style={{ fontSize: 10, opacity: 0.75 }}>FINI$</span>
+      <span style={{ fontSize: 10, opacity: 0.75 }}>CUTE$</span>
     </div>
   );
 }
@@ -824,10 +862,10 @@ function BattleArenaHero({
                 : settled?.status === "voided" || settled?.status === "sold" ? "#a855f7"
                 : remaining > 0 ? "#16a34a" : "#a855f7",
             }}>
-              {settled?.status === "won" ? `🎉 You won — payout ${settled.result?.payout?.toLocaleString() ?? 0} FINI$`
-                : settled?.status === "lost" ? `💀 Lost ${settled.stake} FINI$`
-                : settled?.status === "voided" ? `↩️ Voided — ${settled.stake} FINI$ refunded`
-                : settled?.status === "sold" ? `💸 Sold early for ${settled.soldFor?.toLocaleString() ?? 0} FINI$`
+              {settled?.status === "won" ? `🎉 You won — payout ${settled.result?.payout?.toLocaleString() ?? 0} CUTE$`
+                : settled?.status === "lost" ? `💀 Lost ${settled.stake} CUTE$`
+                : settled?.status === "voided" ? `↩️ Voided — ${settled.stake} CUTE$ refunded`
+                : settled?.status === "sold" ? `💸 Sold early for ${settled.soldFor?.toLocaleString() ?? 0} CUTE$`
                 : remaining > 0 ? "● Battle in progress"
                 : resolutionStatus === "manual_review" ? "⚖️ Awaiting price oracle"
                 : resolutionStatus === "resolving" ? "⌛ Capturing end price…"
@@ -849,16 +887,16 @@ function BattleArenaHero({
           <div style={{ marginTop: 10, fontSize: 12, color: "#666", fontWeight: 600 }}>
             {settled ? (
               settled.status === "won" ? (
-                <>You staked <b>{userBet.stake} FINI$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — won <b style={{ color: "#16a34a" }}>{settled.result?.payout?.toLocaleString() ?? 0} FINI$</b> (net <b style={{ color: "#16a34a" }}>+{(settled.result?.netProfit ?? 0).toLocaleString()}</b>).</>
+                <>You staked <b>{userBet.stake} CUTE$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — won <b style={{ color: "#16a34a" }}>{settled.result?.payout?.toLocaleString() ?? 0} CUTE$</b> (net <b style={{ color: "#16a34a" }}>+{(settled.result?.netProfit ?? 0).toLocaleString()}</b>).</>
               ) : settled.status === "lost" ? (
-                <>You staked <b>{userBet.stake} FINI$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — lost. Better luck next round.</>
+                <>You staked <b>{userBet.stake} CUTE$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — lost. Better luck next round.</>
               ) : settled.status === "voided" ? (
-                <>You staked <b>{userBet.stake} FINI$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — voided, full refund.</>
+                <>You staked <b>{userBet.stake} CUTE$</b> on <b>{userBet.side === "A" ? sideALabel : sideBLabel}</b> — voided, full refund.</>
               ) : settled.status === "sold" ? (
-                <>You sold this position early for <b style={{ color: "#a855f7" }}>{settled.soldFor?.toLocaleString() ?? 0} FINI$</b>.</>
+                <>You sold this position early for <b style={{ color: "#a855f7" }}>{settled.soldFor?.toLocaleString() ?? 0} CUTE$</b>.</>
               ) : null
             ) : (
-              <>You staked <b style={{ color: "#111" }}>{userBet.stake} FINI$</b> on <b style={{ color: userBet.side === "A" ? "#16a34a" : "#dc2626" }}>
+              <>You staked <b style={{ color: "#111" }}>{userBet.stake} CUTE$</b> on <b style={{ color: userBet.side === "A" ? "#16a34a" : "#dc2626" }}>
                 {userBet.side === "A" ? sideALabel : sideBLabel}
               </b>. Sit tight — payout settles when the timer hits zero.</>
             )}
@@ -983,7 +1021,7 @@ function BattleLog({ battle }: { battle: { id: string; assets: string[]; type: s
                 <div key={b.id} style={{ display: "flex", gap: 10, fontSize: 13, alignItems: "baseline" }}>
                   <span style={{ fontFamily: "monospace", color: "#bbb", flexShrink: 0, fontSize: 11 }}>{ago(b.at)}</span>
                   <span style={{ color: "#333", fontWeight: 600 }}>
-                    {b.isBot ? "🤖" : "👤"} <b style={{ fontFamily: b.isBot ? "inherit" : "monospace" }}>{b.handle}</b> backed <b style={{ color: sideColor }}>{sideLabel}</b> with {b.stake.toLocaleString()} FINI$
+                    {b.isBot ? "🤖" : "👤"} <b style={{ fontFamily: b.isBot ? "inherit" : "monospace" }}>{b.handle}</b> backed <b style={{ color: sideColor }}>{sideLabel}</b> with {b.stake.toLocaleString()} CUTE$
                   </span>
                 </div>
               );

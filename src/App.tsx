@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 import { Routes, Route } from "react-router-dom";
+import { useCoinStore } from "./state/coinStore";
 import { BattleArena } from "./components/BattleArena";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
@@ -44,6 +45,8 @@ import { StrategiesPage } from "./pages/StrategiesPage";
 import { AdminBotsPage } from "./pages/AdminBotsPage";
 import { Fini3DTestPage } from "./pages/Fini3DTestPage";
 import { AnimLabPage } from "./pages/AnimLabPage";
+import { TermsPage } from "./pages/TermsPage";
+import { TermsGate } from "./components/TermsGate";
 
 export default function App() {
   // Battle settlement runs globally so resolutions happen no matter where
@@ -51,16 +54,21 @@ export default function App() {
   // resolves.
   useBattleResolver();
   useStrategyExecutor();
+  // Pull operator-tuned economy levers (grant/rescue/floor) once on load so the
+  // BalanceChip shows the configured amounts, not just the hardcoded defaults.
+  useEffect(() => { useCoinStore.getState().loadEconomy(); }, []);
   return (
     <>
       <WalletSync />
       <SiteNav />
       <DevWalletSwitcher />
       <NotificationToasts />
+      <TermsGate />
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/crypto" element={<CryptoArenaPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/crypto/:asset" element={<AssetPage />} />
           <Route path="/battle/:battleId" element={<BattlePage />} />
           <Route path="/claim" element={<ClaimPage />} />

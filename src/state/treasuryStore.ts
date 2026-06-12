@@ -1,5 +1,5 @@
 /**
- * Treasury — the platform's reserve of FINI$ that funds ghost-battle payouts
+ * Treasury — the platform's reserve of CUTE$ that funds ghost-battle payouts
  * during beta. Public-facing so players can see "Treasury: 9.8M remaining"
  * and trust the numbers.
  *
@@ -18,7 +18,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-const INITIAL_TREASURY    = 10_000_000;  // 10M FINI$ — matches the claim cap
+const INITIAL_TREASURY    = 10_000_000;  // 10M CUTE$ — matches the claim cap
 const DAILY_PAYOUT_CAP    = 1_000;       // per-wallet daily cap on net wins from treasury
 
 interface TreasuryState {

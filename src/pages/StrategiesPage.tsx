@@ -66,7 +66,7 @@ export function StrategiesPage() {
                 <div style={{ fontSize: 9, fontWeight: 800, color: "#92400e", textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.8 }}>Wallet</div>
                 <div style={{ fontSize: 20, fontWeight: 900 }}>
                   🪙 {walletBalance.toLocaleString()}
-                  <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 4 }}>FINI$</span>
+                  <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 4 }}>CUTE$</span>
                 </div>
               </div>
               {totalAllocated > 0 && (
@@ -80,7 +80,7 @@ export function StrategiesPage() {
                   <div style={{ fontSize: 9, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Locked in attacks</div>
                   <div style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>
                     {totalAllocated.toLocaleString()}
-                    <span style={{ fontSize: 11, color: "#888", marginLeft: 4 }}>FINI$</span>
+                    <span style={{ fontSize: 11, color: "#888", marginLeft: 4 }}>CUTE$</span>
                   </div>
                 </div>
               )}
@@ -151,7 +151,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
       earn(r.refund);
       pushNotif({
         tone: "info", icon: "💰",
-        title: `Attack retired — ${r.refund.toLocaleString()} FINI$ refunded`,
+        title: `Attack retired — ${r.refund.toLocaleString()} CUTE$ refunded`,
         body: `${strategy.name} returned remaining budget + saved profits to your wallet.`,
       });
     }
@@ -203,7 +203,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
           <span style={{ fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Budget</span>
           <span style={{ fontWeight: 800, color: "#111" }}>
             {strategy.budget.remaining.toLocaleString()} / {strategy.budget.allocated.toLocaleString()}
-            <span style={{ color: "#888", fontWeight: 600 }}> FINI$</span>
+            <span style={{ color: "#888", fontWeight: 600 }}> CUTE$</span>
           </span>
         </div>
         <div style={{ height: 6, borderRadius: 100, background: "#f3f4f6", overflow: "hidden" }}>
@@ -215,7 +215,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
         </div>
         {strategy.budget.savedProfits > 0 && (
           <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 700, marginTop: 4 }}>
-            💰 +{strategy.budget.savedProfits.toLocaleString()} FINI$ saved (withdrawable on retire)
+            💰 +{strategy.budget.savedProfits.toLocaleString()} CUTE$ saved (withdrawable on retire)
           </div>
         )}
       </div>
@@ -229,7 +229,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
 
       {/* Config strip */}
       <div style={{ fontSize: 11, color: "#666", lineHeight: 1.6, marginBottom: 12, fontWeight: 500 }}>
-        <span style={{ color: "#888" }}>Capital </span><b style={{ color: "#854d0e" }}>{strategy.stake} FINI$</b>
+        <span style={{ color: "#888" }}>Capital </span><b style={{ color: "#854d0e" }}>{strategy.stake} CUTE$</b>
         <span style={{ color: "#aaa" }}> · </span>
         <span style={{ color: "#888" }}>{strategy.reinvest === "compound" ? "♻️ Compound" : "💰 Save profits"}</span>
         <span style={{ color: "#aaa" }}> · </span>
@@ -280,7 +280,7 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
           border: "1.5px solid #e5e7eb",
           fontSize: 12, fontWeight: 700, cursor: "pointer",
         }}>✏️ Edit</button>
-        <button onClick={() => { if (confirm(`Retire "${strategy.name}"? Remaining budget + saved profits (${(strategy.budget.remaining + strategy.budget.savedProfits).toLocaleString()} FINI$) will be refunded to your wallet.`)) handleRetire(); }} title="Retire and refund" style={{
+        <button onClick={() => { if (confirm(`Retire "${strategy.name}"? Remaining budget + saved profits (${(strategy.budget.remaining + strategy.budget.savedProfits).toLocaleString()} CUTE$) will be refunded to your wallet.`)) handleRetire(); }} title="Retire and refund" style={{
           padding: "8px 14px", borderRadius: 100,
           background: "transparent", color: "#888",
           border: "1.5px solid #e5e7eb",
@@ -332,11 +332,11 @@ function DeployModal({ onClose }: { onClose: () => void }) {
 
   function deploy() {
     if (!canAfford) {
-      alert(`Not enough FINI$ in your wallet. You have ${balance.toLocaleString()}, need ${budgetAllocated.toLocaleString()}.`);
+      alert(`Not enough CUTE$ in your wallet. You have ${balance.toLocaleString()}, need ${budgetAllocated.toLocaleString()}.`);
       return;
     }
     if (!validBudget) {
-      alert(`Budget must be at least the per-forecast stake (${stake} FINI$).`);
+      alert(`Budget must be at least the per-forecast stake (${stake} CUTE$).`);
       return;
     }
     // Strategy name auto-derived from the template — no manual input needed
@@ -372,7 +372,7 @@ function DeployModal({ onClose }: { onClose: () => void }) {
     pushNotif({
       tone: "info", icon: "🚀",
       title: `Attack deployed`,
-      body: `${finalName} is now live with ${budgetAllocated.toLocaleString()} FINI$ allocated.`,
+      body: `${finalName} is now live with ${budgetAllocated.toLocaleString()} CUTE$ allocated.`,
       durationMs: 5000,
     });
     onClose();
@@ -418,7 +418,7 @@ function DeployModal({ onClose }: { onClose: () => void }) {
         </Field>
 
         {/* Budget allocation */}
-        <Field label={`💰 Total budget to allocate (deducted from wallet · you have ${balance.toLocaleString()} FINI$)`}>
+        <Field label={`💰 Total budget to allocate (deducted from wallet · you have ${balance.toLocaleString()} CUTE$)`}>
           <input type="number" min={stake} value={budgetAllocated} onChange={e => setBudgetAllocated(Math.max(stake, Number(e.target.value)))} style={{ ...inputStyle, color: canAfford ? "#111" : "#dc2626" }} />
           {!canAfford && <div style={{ fontSize: 11, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>⚠️ Not enough in wallet</div>}
         </Field>
@@ -557,7 +557,7 @@ function DeployModal({ onClose }: { onClose: () => void }) {
           border: "none", borderRadius: 100, padding: "12px 0",
           fontSize: 14, fontWeight: 900, cursor: canAfford && validBudget ? "pointer" : "not-allowed",
           boxShadow: canAfford && validBudget ? "0 4px 14px rgba(244,114,182,0.30)" : "none",
-        }}>🚀 Deploy with {budgetAllocated.toLocaleString()} FINI$</button>
+        }}>🚀 Deploy with {budgetAllocated.toLocaleString()} CUTE$</button>
         <div style={{ fontSize: 11, color: "#aaa", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
           Budget is held by the strategy. Retire at any time to refund remaining budget + saved profits to your wallet.
         </div>
@@ -644,7 +644,7 @@ function EditStrategyModal({ strategy, onClose }: { strategy: Strategy; onClose:
         <div style={{ background: "#fafafa", borderRadius: 10, padding: "12px 14px", marginBottom: 14, border: "1px solid #f0f0f0" }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Locked</div>
           <div style={{ fontSize: 11, color: "#666", lineHeight: 1.6 }}>
-            Strategy: <b style={{ color: "#111" }}>{meta.name}</b> · Budget: <b style={{ color: "#854d0e" }}>{strategy.budget.allocated.toLocaleString()} FINI$</b>{" "}
+            Strategy: <b style={{ color: "#111" }}>{meta.name}</b> · Budget: <b style={{ color: "#854d0e" }}>{strategy.budget.allocated.toLocaleString()} CUTE$</b>{" "}
             <span style={{ color: "#aaa" }}>({strategy.budget.remaining.toLocaleString()} remaining)</span>
             <br />
             <span style={{ fontSize: 10, color: "#aaa" }}>To change these, retire the strategy and deploy a new one.</span>

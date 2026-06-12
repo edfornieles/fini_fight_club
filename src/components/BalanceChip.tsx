@@ -5,8 +5,8 @@ import { useNotifications } from "../state/notificationsStore";
 import { useNavigate } from "react-router-dom";
 
 /**
- * Top-nav FINI$ chip + a drop/rescue chip so players never get stuck:
- *   - 🎁 Daily drop — come back each day, claim +500 FINI$ (rewards activity)
+ * Top-nav CUTE$ chip + a drop/rescue chip so players never get stuck:
+ *   - 🎁 Daily drop — come back each day, claim +500 CUTE$ (rewards activity)
  *   - 🪂 Top up — when you're nearly broke (< 100), grab +500 to keep playing
  * (Crumbs are the in-battle currency and live in the Fight Club shop area.)
  */
@@ -16,6 +16,7 @@ export function BalanceChip({ compact = false }: { compact?: boolean }) {
   const claimDailyDrop = useCoinStore(s => s.claimDailyDrop);
   const rescueTopUp = useCoinStore(s => s.rescueTopUp);
   const dropCooldownMs = useCoinStore(s => s.dropCooldownMs);
+  const economy = useCoinStore(s => s.economy);
   const pushNotif = useNotifications(s => s.push);
   const navigate = useNavigate();
   const [, tick] = useState(0);
@@ -29,29 +30,29 @@ export function BalanceChip({ compact = false }: { compact?: boolean }) {
   if (!walletAddress) return null;
 
   const dropReady = dropCooldownMs() <= 0;
-  const broke = balance < 100;
+  const broke = balance < economy.rescueFloor;
 
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "'Nunito', system-ui, sans-serif" }}>
       {/* Daily drop OR rescue — whichever is relevant */}
       {broke ? (
         <button
-          onClick={() => { const a = rescueTopUp(); if (a) pushNotif({ tone: "win", icon: "🪂", title: `+${a} FINI$ top-up`, body: "A little something to keep you in the game." }); }}
+          onClick={async () => { const a = await rescueTopUp(); if (a) pushNotif({ tone: "win", icon: "🪂", title: `+${a} CUTE$ top-up`, body: "A little something to keep you in the game." }); }}
           title="You're low — grab a top-up to keep playing"
           style={dropBtnStyle("#ef4444")}
         >🪂 Top up</button>
       ) : dropReady ? (
         <button
-          onClick={() => { const a = claimDailyDrop(); if (a) pushNotif({ tone: "win", icon: "🎁", title: `Daily drop: +${a} FINI$`, body: "Thanks for coming back — see you tomorrow for more." }); tick(n => n + 1); }}
-          title="Your daily FINI$ drop is ready"
+          onClick={async () => { const a = await claimDailyDrop(); if (a) pushNotif({ tone: "win", icon: "🎁", title: `Daily drop: +${a} CUTE$`, body: "Thanks for coming back — see you tomorrow for more." }); tick(n => n + 1); }}
+          title="Your daily CUTE$ drop is ready"
           style={dropBtnStyle("#16a34a")}
-        >🎁 Daily +500</button>
+        >🎁 Daily +{economy.dailyGrant}</button>
       ) : null}
 
       {/* Balance */}
       <button
         onClick={() => navigate("/claim")}
-        title="Your FINI$ bankroll — entry stakes & prizes"
+        title="Your CUTE$ bankroll — entry stakes & prizes"
         style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           padding: compact ? "5px 10px" : "7px 14px",
@@ -67,7 +68,7 @@ export function BalanceChip({ compact = false }: { compact?: boolean }) {
       >
         <span style={{ fontSize: compact ? 13 : 15 }}>🪙</span>
         <span>{fmtCoin(balance, { compact })}</span>
-        <span style={{ opacity: 0.75, fontWeight: 700 }}>FINI$</span>
+        <span style={{ opacity: 0.75, fontWeight: 700 }}>CUTE$</span>
       </button>
     </span>
   );

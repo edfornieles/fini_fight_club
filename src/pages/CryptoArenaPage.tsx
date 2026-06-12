@@ -9,6 +9,7 @@ import { useMyEntries, positionValue } from "../state/myEntriesStore";
 import { useCoinStore } from "../state/coinStore";
 import { useNotifications } from "../state/notificationsStore";
 import { personaFor } from "../lib/ghostPersonas";
+import { isOnline } from "../lib/supabase";
 
 const TOPIC_TABS = ["Trending", "Live", "Ending Soon", "High Volume"];
 const ASSET_FILTERS = ["All", "BTC", "ETH", "SOL", "DOGE", "BNB", "LINK", "AVAX"];
@@ -16,7 +17,8 @@ const TYPE_FILTERS: { label: string; value: BattleType | "all" }[] = [
   { label: "All", value: "all" },
   { label: "Up / Down", value: "updown" },
   { label: "Outperform", value: "outperform" },
-  { label: "Clan War", value: "clanwar" },
+  // Clan War battles only exist in the offline sim — hide the dead filter online.
+  ...(isOnline ? [] : [{ label: "Clan War", value: "clanwar" as const }]),
 ];
 
 export function CryptoArenaPage() {
@@ -68,12 +70,14 @@ export function CryptoArenaPage() {
             <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: "#dcfce7", color: "#15803d" }}>
               {liveCount} Live
             </span>
-            <span title="Top 100 Fini holders are running automated strategies that react to live market signals" style={{
+            <span title={isOnline
+              ? "House bots trade both sides of every battle so there's always a live market to play against"
+              : "Top 100 Fini holders are running automated strategies that react to live market signals"} style={{
               fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100,
               background: "#ede9fe", color: "#6d28d9",
               display: "inline-flex", alignItems: "center", gap: 5,
             }}>
-              ⚡ 100 traders active
+              {isOnline ? "🤖 Live market — bots & players" : "⚡ 100 traders active"}
             </span>
             <Link to="/strategies" style={{
               marginLeft: "auto",
@@ -223,7 +227,7 @@ export function CryptoArenaPage() {
                       <div style={{ fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 6 }}>
                         <span style={{ color: sideColor, fontWeight: 800 }}>{entry.sideLabel}</span>
                         <span style={{ color: "#aaa" }}> · </span>
-                        <span style={{ color: "#854d0e", fontWeight: 800 }}>{entry.stake} FINI$</span>
+                        <span style={{ color: "#854d0e", fontWeight: 800 }}>{entry.stake} CUTE$</span>
                       </div>
 
                       {/* Champion Fini HP bar — live market % of the backed side */}
@@ -243,8 +247,10 @@ export function CryptoArenaPage() {
                         </div>
                       )}
 
-                      {/* Mark-to-market value + sell-early (Polymarket-style) */}
-                      {!settled && (() => {
+                      {/* Mark-to-market value + sell-early (Polymarket-style).
+                          Offline/dev only — the server has no early-exit primitive,
+                          so crediting locally would desync the authoritative balance. */}
+                      {!settled && !isOnline && (() => {
                         const curVal = liveBattle ? positionValue(entry, yourHpPct) : entry.stake;
                         const pnl = curVal - entry.stake;
                         const pnlColor = pnl > 0 ? "#16a34a" : pnl < 0 ? "#dc2626" : "#888";
@@ -252,7 +258,7 @@ export function CryptoArenaPage() {
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                             <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#666" }}>
                               Worth now{" "}
-                              <span style={{ color: "#111", fontWeight: 900 }}>{curVal} FINI$</span>{" "}
+                              <span style={{ color: "#111", fontWeight: 900 }}>{curVal} CUTE$</span>{" "}
                               <span style={{ color: pnlColor, fontWeight: 800 }}>
                                 ({pnl >= 0 ? "+" : ""}{pnl})
                               </span>
@@ -266,8 +272,8 @@ export function CryptoArenaPage() {
                                   pushNotif({
                                     tone: pnl >= 0 ? "win" : "loss",
                                     icon: "💸",
-                                    title: `Sold for ${curVal} FINI$`,
-                                    body: `${entry.battleTitle} — cashed out early at ${Math.round(yourHpPct)}% (entered ${Math.round(entry.entryPct)}%). ${pnl >= 0 ? "+" : ""}${pnl} FINI$.`,
+                                    title: `Sold for ${curVal} CUTE$`,
+                                    body: `${entry.battleTitle} — cashed out early at ${Math.round(yourHpPct)}% (entered ${Math.round(entry.entryPct)}%). ${pnl >= 0 ? "+" : ""}${pnl} CUTE$.`,
                                     durationMs: 6000,
                                   });
                                 }
@@ -288,7 +294,7 @@ export function CryptoArenaPage() {
                       {/* Sold confirmation chip */}
                       {entry.status === "sold" && (
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#6d28d9", marginBottom: 6 }}>
-                          💸 Sold early for {entry.soldFor} FINI$ ({(entry.soldFor ?? 0) - entry.stake >= 0 ? "+" : ""}{(entry.soldFor ?? 0) - entry.stake})
+                          💸 Sold early for {entry.soldFor} CUTE$ ({(entry.soldFor ?? 0) - entry.stake >= 0 ? "+" : ""}{(entry.soldFor ?? 0) - entry.stake})
                         </div>
                       )}
 
@@ -350,7 +356,7 @@ export function CryptoArenaPage() {
                       <span style={{ fontSize: 10, color: sideColor, fontWeight: 800, flexShrink: 0 }}>{entry.sideLabel}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }}>
-                      {entry.amount} FINI$ on <span style={{ color: "#666", fontWeight: 600 }}>{entry.asset}</span>
+                      {entry.amount} CUTE$ on <span style={{ color: "#666", fontWeight: 600 }}>{entry.asset}</span>
                     </div>
                     {(persona.fameTag || persona.pnl24h !== 0) && (
                       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontSize: 9, fontWeight: 700 }}>
@@ -371,7 +377,7 @@ export function CryptoArenaPage() {
         </div>
 
         <div style={{ marginTop: 40, padding: "16px 20px", borderRadius: 12, background: "#f3f4f6", fontSize: 11, color: "#9ca3af", lineHeight: 1.6 }}>
-          Fini Coin is a non-transferable in-game currency with no real-world value. This is a game.
+          CUTE$ is a non-transferable in-game currency with no real-world value. This is a game.
         </div>
       </div>
     </div>

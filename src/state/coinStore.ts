@@ -28,10 +28,15 @@ interface CoinState {
   lastDropByWallet: Record<string, number>;
   /** Ms until the active wallet can claim its next daily drop (0 = available). */
   dropCooldownMs: () => number;
-  /** Claim the daily drop if available. Returns the amount granted (0 if on cooldown). */
-  claimDailyDrop: () => number;
+  /** Claim the daily drop if available. Returns the amount granted (0 if on cooldown / failed). */
+  claimDailyDrop: () => Promise<number>;
   /** Emergency top-up when nearly broke — always available under the floor. Returns amount. */
-  rescueTopUp: () => number;
+  rescueTopUp: () => Promise<number>;
+
+  /** Operator-tunable economy levers (from economy_config; defaults until loaded). */
+  economy: { dailyGrant: number; rescueAmount: number; rescueFloor: number };
+  /** Pull the latest economy levers from the public economy_config row (online only). */
+  loadEconomy: () => Promise<void>;
 }
 
 const DAILY_DROP = 500;
@@ -47,6 +52,20 @@ export const useCoinStore = create<CoinState>()(
       balance: 0,
       loaded: false,
       lastDropByWallet: {},
+      economy: { dailyGrant: DAILY_DROP, rescueAmount: RESCUE_AMOUNT, rescueFloor: RESCUE_FLOOR },
+
+      loadEconomy: async () => {
+        if (!isOnline) return;
+        try {
+          const { data } = await supabase.from("economy_config")
+            .select("daily_grant, rescue_amount, rescue_floor").eq("id", 1).maybeSingle();
+          if (data) set({ economy: {
+            dailyGrant:   Number(data.daily_grant   ?? DAILY_DROP),
+            rescueAmount: Number(data.rescue_amount ?? RESCUE_AMOUNT),
+            rescueFloor:  Number(data.rescue_floor  ?? RESCUE_FLOOR),
+          } });
+        } catch { /* keep defaults */ }
+      },
 
       dropCooldownMs: () => {
         const w = get().activeWallet;
@@ -54,18 +73,52 @@ export const useCoinStore = create<CoinState>()(
         const last = get().lastDropByWallet[w] ?? 0;
         return Math.max(0, DROP_COOLDOWN_MS - (Date.now() - last));
       },
-      claimDailyDrop: () => {
+      claimDailyDrop: async () => {
         const w = get().activeWallet;
         if (!w) return 0;
         if (get().dropCooldownMs() > 0) return 0;
-        get().earn(DAILY_DROP);
+
+        // Online: the server is authoritative — it enforces the cooldown, reads
+        // the configured amount, credits the ledger, and we adopt the result.
+        if (isOnline) {
+          try {
+            const r = await api.claimGrant("daily");
+            set(s => ({ lastDropByWallet: { ...s.lastDropByWallet, [w]: Date.now() } }));
+            await get().refresh(w);
+            return r.amount;
+          } catch (e) {
+            // Server says we're still on cooldown — sync the local clock so the
+            // UI stops offering the button, and report "nothing granted".
+            const msg = e instanceof Error ? e.message : "";
+            if (msg.includes("cooldown")) {
+              set(s => ({ lastDropByWallet: { ...s.lastDropByWallet, [w]: Date.now() } }));
+            }
+            return 0;
+          }
+        }
+
+        // Offline / dev: keep the local grant.
+        get().earn(get().economy.dailyGrant);
         set(s => ({ lastDropByWallet: { ...s.lastDropByWallet, [w]: Date.now() } }));
-        return DAILY_DROP;
+        return get().economy.dailyGrant;
       },
-      rescueTopUp: () => {
-        if (get().balance >= RESCUE_FLOOR) return 0;
-        get().earn(RESCUE_AMOUNT);
-        return RESCUE_AMOUNT;
+      rescueTopUp: async () => {
+        const w = get().activeWallet;
+        if (get().balance >= get().economy.rescueFloor) return 0;
+
+        if (isOnline && w) {
+          try {
+            const r = await api.claimGrant("rescue");
+            await get().refresh(w);
+            return r.amount;
+          } catch {
+            return 0;
+          }
+        }
+
+        // Offline / dev: keep the local top-up.
+        get().earn(get().economy.rescueAmount);
+        return get().economy.rescueAmount;
       },
 
       useWallet: (wallet, seed = DEFAULT_SEED) => {
@@ -79,13 +132,15 @@ export const useCoinStore = create<CoinState>()(
           loaded: true,
           balancesByWallet: existing == null ? { ...map, [w]: bal } : map,
         });
-        // Pull the authoritative server balance if available (bots/real claims).
+        // Pull the authoritative server balance. Online, the server is ALWAYS
+        // the truth — including a genuine 0 (fresh signup before any claim, or
+        // a busted bankroll). Keeping the local 1000 seed there is a lie: the
+        // chip says you're flush while every bet 402s "insufficient_funds".
+        // The seed only backs offline/dev play.
         if (isOnline) {
+          get().loadEconomy();
           getBalance(w).then(serverBal => {
-            // Only adopt the server balance if it's meaningful (>0) and this is
-            // still the active wallet. Server is source of truth for funded
-            // accounts; local seed covers fresh play accounts.
-            if (serverBal > 0 && get().activeWallet === w) {
+            if (get().activeWallet === w) {
               set(s => ({ balance: serverBal, balancesByWallet: { ...s.balancesByWallet, [w]: serverBal } }));
             }
           }).catch(() => { /* keep local */ });
@@ -132,19 +187,25 @@ export const useCoinStore = create<CoinState>()(
       },
     }),
     {
-      name: "fini-coin-cache-v2", // v2: per-wallet balances
+      name: "cute-coin-cache-v3", // v3: CUTE$ rebrand (clean slate from FINI$ v2)
       partialize: (s) => ({ balancesByWallet: s.balancesByWallet, activeWallet: s.activeWallet, balance: s.balance, lastDropByWallet: s.lastDropByWallet }),
     },
   ),
 );
 
-export const COIN_LABEL = "FINI$";
+export const COIN_LABEL = "CUTE$";
 
 export function fmtCoin(n: number, opts: { compact?: boolean } = {}): string {
   if (opts.compact && n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (opts.compact && n >= 10_000)    return `${(n / 1_000).toFixed(0)}K`;
   if (opts.compact && n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString("en-US");
+}
+
+// Pull operator-tuned economy levers once at startup so button labels/amounts
+// reflect config even before a wallet connects.
+if (isOnline) {
+  useCoinStore.getState().loadEconomy();
 }
 
 // Auto-switch balance whenever a real wallet connects via SIWE.

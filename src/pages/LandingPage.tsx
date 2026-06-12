@@ -90,7 +90,7 @@ export function LandingPage() {
 
       {/* Disclaimer */}
       <div style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb", padding: "16px 48px", fontSize: 11, color: "#9ca3af", lineHeight: 1.6 }}>
-        Fini Coin is a non-transferable game currency. Fini Coin cannot be withdrawn or exchanged for money or crypto. This is a game, not financial advice. Crypto price data may be delayed or inaccurate. Do not use this site as a trading tool.
+        CUTE$ is a non-transferable game currency. CUTE$ cannot be withdrawn or exchanged for money or crypto. This is a game, not financial advice. Crypto price data may be delayed or inaccurate. Do not use this site as a trading tool.
       </div>
     </div>
   );

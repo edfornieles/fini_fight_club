@@ -16,6 +16,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { supabase, isOnline } from "../lib/supabase";
 
 export interface MyEntry {
   battleId: string;
@@ -33,11 +34,11 @@ export interface MyEntry {
   /** If the forecast was placed by a Strategy/Forecaster, the strategy's id. */
   strategyId?: string;
   /** Set when the player sells the position early (cash-out before resolution). */
-  soldFor?: number;     // FINI$ received on early exit
-  /** Set when the battle resolves. Payout in FINI$ (0 for losses). */
+  soldFor?: number;     // CUTE$ received on early exit
+  /** Set when the battle resolves. Payout in CUTE$ (0 for losses). */
   result?: {
     settledAt: number;
-    payout: number;       // FINI$ paid to the user (0 if lost, stake refund if void)
+    payout: number;       // CUTE$ paid to the user (0 if lost, stake refund if void)
     netProfit: number;    // payout - stake (negative for losses)
     winningSide: "A" | "B" | null;  // null = void/draw
   };
@@ -63,6 +64,9 @@ interface MyEntriesState {
   getForBattle: (battleId: string) => MyEntry | undefined;
   /** Settle an open entry. winningSide=null means void/draw (stake refunded). */
   resolveEntry: (battleId: string, winningSide: "A" | "B" | null) => MyEntry | null;
+  /** Settle an open entry from SERVER truth: the server's prediction status +
+   *  pari-mutuel payout (used when online — never recompute the payout locally). */
+  settleServer: (battleId: string, serverStatus: string, payout: number) => MyEntry | null;
   /** Sell an open position early at the given current value. Marks it "sold". */
   sellEntry: (battleId: string, value: number) => MyEntry | null;
   /** Drop settled entries older than maxAgeMs (active wallet only). */
@@ -121,7 +125,7 @@ export const useMyEntries = create<MyEntriesState>()(
         const entry = get().entries.find(e => e.battleId === battleId);
         if (!entry || entry.status !== "open") return null;
         // Polymarket-style share payout: you "bought" stake/(entryPct/100)
-        // shares, each worth 1 FINI$ if your side wins. Backing an underdog
+        // shares, each worth 1 CUTE$ if your side wins. Backing an underdog
         // (low entryPct) pays more; backing a favourite pays less.
         //   win   → stake × 100/entryPct   (50%→2×, 40%→2.5×, 70%→1.43×)
         //   void  → stake refunded
@@ -135,6 +139,28 @@ export const useMyEntries = create<MyEntriesState>()(
           ...entry,
           status: voided ? "voided" : won ? "won" : "lost",
           result: { settledAt: Date.now(), payout, netProfit, winningSide },
+        };
+        mutateActive(get, set, list => list.map(e => e.battleId === battleId ? settled : e));
+        return settled;
+      },
+
+      settleServer: (battleId, serverStatus, payout) => {
+        const entry = get().entries.find(e => e.battleId === battleId);
+        if (!entry || entry.status !== "open") return null;
+        const voided = serverStatus === "voided";
+        const won = !voided && payout > 0;
+        // Server payout is the source of truth: void → stake refunded (netProfit 0),
+        // win → pari-mutuel amount, loss → 0. winningSide is inferred from our own
+        // outcome (we know the side we backed).
+        const settled: MyEntry = {
+          ...entry,
+          status: voided ? "voided" : won ? "won" : "lost",
+          result: {
+            settledAt: Date.now(),
+            payout,
+            netProfit: payout - entry.stake,
+            winningSide: voided ? null : won ? entry.side : (entry.side === "A" ? "B" : "A"),
+          },
         };
         mutateActive(get, set, list => list.map(e => e.battleId === battleId ? settled : e));
         return settled;
@@ -172,6 +198,17 @@ export const useMyEntries = create<MyEntriesState>()(
     }
   )
 );
+
+// Keep the active entries list pointed at the SIWE-authed wallet (mirrors the
+// coinStore behaviour) so settlement reads the right wallet's predictions.
+if (isOnline) {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      const wallet = (session?.user?.user_metadata?.wallet as string | undefined)?.toLowerCase();
+      if (wallet) useMyEntries.getState().useWallet(wallet);
+    }
+  });
+}
 
 /**
  * Current mark-to-market value of an open position, Polymarket-style.

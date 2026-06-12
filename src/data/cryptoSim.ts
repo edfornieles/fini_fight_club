@@ -18,6 +18,8 @@ import { MOCK_BATTLES, type Battle } from "./mockBattles";
 import { getCachedPrices } from "../lib/priceProviders";
 import { snapBattleOpening, intraWindowReturn } from "../lib/openingPrices";
 import { personaFor, personaPickSide } from "../lib/ghostPersonas";
+import { isOnline } from "../lib/supabase";
+import { fetchArenaState } from "./arenaServer";
 
 // Parse "15m" / "1h" / "24h" → milliseconds
 function parseDuration(label: string): number {
@@ -122,7 +124,7 @@ export interface SimEntry {
   side: "A" | "B";
   sideLabel: string;
   asset: string;        // e.g. BTC
-  amount: number;       // FINI$ staked
+  amount: number;       // CUTE$ staked
   at: number;           // epoch ms
 }
 
@@ -164,6 +166,25 @@ export const useCryptoSim = create<SimState>((set, get) => ({
   start: () => {
     if (get().started) return;
     set({ started: true });
+
+    // ── Online: mirror the REAL backend ──────────────────────────────────────
+    // Battles + feed come from the server's open battle_instances + predictions
+    // (the same arena the house bots play in). Humans and bots share pools. The
+    // client simulation below is now only the offline/dev fallback.
+    if (isOnline) {
+      const poll = async () => {
+        try {
+          const { battles, feed } = await fetchArenaState();
+          if (battles.length === 0) return; // keep last good state on an empty/failed pull
+          for (const b of battles) if (!battleEndsAt.has(b.id)) battleEndsAt.set(b.id, Date.now() + b.endsInMs);
+          set({ battles, feed });
+        } catch { /* keep last good state */ }
+      };
+      void poll();
+      timer = setInterval(poll, 5000);
+      return;
+    }
+
     loadWallets();
     // Snap an endsAt for each battle so fair-odds tracks consistent elapsed time
     for (const b of get().battles) {

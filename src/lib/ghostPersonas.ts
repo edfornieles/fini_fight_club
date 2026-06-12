@@ -7,7 +7,7 @@
  * 24h P&L) shown in the activity feed.
  *
  * Why: a 1700-holder snapshot feels lifeless if every entry just says
- * "0x4733…2679 bet 134 FINI$". Recognisable identities make the feed
+ * "0x4733…2679 bet 134 CUTE$". Recognisable identities make the feed
  * feel like a real prediction market with characters, not random hex.
  *
  * Everything is deterministic from the wallet address so the same wallet

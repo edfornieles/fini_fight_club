@@ -164,7 +164,7 @@ export function WinnerBanner({
             boxShadow: `0 4px 14px ${playerWon ? "#16a34a55" : "#dc262655"}`,
           }}>
             {playerWon
-              ? `🎉 You won ${userPayout != null ? userPayout.toLocaleString() + " FINI$" : ""}`
+              ? `🎉 You won ${userPayout != null ? userPayout.toLocaleString() + " CUTE$" : ""}`
               : "💀 You lost this one"}
           </div>
         )}

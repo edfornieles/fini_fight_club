@@ -2,7 +2,7 @@
  * Notifications — short-lived celebratory/informational toasts.
  *
  * Used for:
- *  - Crypto Arena battle resolutions ("🎉 You won 200 FINI$ on BTC Up!")
+ *  - Crypto Arena battle resolutions ("🎉 You won 200 CUTE$ on BTC Up!")
  *  - Fight Club run milestones (cashout tier, streak unlocks)
  *  - Any place we want to surface something good (or bad) outside the page flow
  *

@@ -25,7 +25,7 @@ export function ChallengePage() {
   const from = (params.get("from") ?? "").toLowerCase();
   const teamStr = params.get("team") ?? "";
   // Clamp the URL stake to a positive integer; default 100. (?stake=abc/0/-5
-  // previously rendered "NaN FINI$".)
+  // previously rendered "NaN CUTE$".)
   const stakeRaw = Math.floor(Number(params.get("stake") ?? "100"));
   const stake = Number.isFinite(stakeRaw) && stakeRaw > 0 ? stakeRaw : 100;
 
@@ -96,7 +96,7 @@ export function ChallengePage() {
             <Link to={`/p/${from}`} style={{ fontFamily: "monospace", color: "#111", textDecoration: "underline" }}>{short}</Link> wants to fight
           </h1>
           <div style={{ fontSize: 14, color: "#666", marginTop: 10, fontWeight: 600 }}>
-            Stake: <b style={{ color: "#854d0e" }}>{stake} FINI$</b> · winner takes both
+            Stake: <b style={{ color: "#854d0e" }}>{stake} CUTE$</b> · winner takes both
           </div>
         </div>
 
@@ -149,7 +149,7 @@ export function ChallengePage() {
         </div>
 
         <div style={{ marginTop: 18, fontSize: 11, color: "#aaa", textAlign: "center", lineHeight: 1.5 }}>
-          You'll pick your own 3 starters in the next screen. Both sides stake {stake} FINI$ —
+          You'll pick your own 3 starters in the next screen. Both sides stake {stake} CUTE$ —
           winner takes the pot.
         </div>
 
