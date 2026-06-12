@@ -25,9 +25,19 @@ type FiniModelProps = {
   timeScale?: number;
   /** Live price mood — swaps the face texture's mouth (frown/flat/squiggle). */
   mood?: FiniLiveMood;
+  /** Small thumbnails: keep the mood FACE but use an upright body clip — the
+   *  dramatic prone clips (near-dead collapse) read as a crumpled speck in a
+   *  120px card. The big viewer / arena leave this off for the full drama. */
+  compact?: boolean;
 };
 
-export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: FiniModelProps) {
+// In compact (thumbnail) mode, the very-sad collapse stays upright as a mope.
+const COMPACT_MOOD_CLIP: Partial<Record<FiniLiveMood, string>> = {
+  ...MOOD_IDLE_CLIP,
+  sick: FINI_MOOD_IDLE_URL.sad.clip,
+};
+
+export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood, compact = false }: FiniModelProps) {
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const anims = useGLTF(FINI_ANIMATIONS_URL);
@@ -66,8 +76,9 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
 
   useEffect(() => {
     if (!actions || names.length === 0) return;
-    // Priority: explicit clip prop (battle states) → mood idle → happy idle.
-    const moodClip = mood ? MOOD_IDLE_CLIP[mood] : undefined;
+    // Priority: explicit clip prop (battle states) → mood body clip → happy idle.
+    const moodMap = compact ? COMPACT_MOOD_CLIP : MOOD_IDLE_CLIP;
+    const moodClip = mood ? moodMap[mood] : undefined;
     const target = (clip && actions[clip] ? clip : null)
       ?? (moodClip && actions[moodClip] ? moodClip : null)
       ?? (actions[FINI_IDLE_CLIP] ? FINI_IDLE_CLIP : names[0]);
@@ -78,7 +89,7 @@ export function FiniModel({ tokenId, clip, scale = 1, timeScale = 1, mood }: Fin
     return () => {
       action.fadeOut(0.25);
     };
-  }, [actions, names, clip, timeScale, mood]);
+  }, [actions, names, clip, timeScale, mood, compact]);
 
   return (
     <group ref={groupRef} scale={scale}>

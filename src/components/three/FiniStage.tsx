@@ -12,6 +12,8 @@ type FiniStageProps = {
   timeScale?: number;
   /** Live price mood — drives the face texture (mouth swap). */
   mood?: import("../../lib/finiMood").FiniLiveMood;
+  /** Small thumbnails: keep the mood face but upright body (no prone clips). */
+  compact?: boolean;
 };
 
 // Finis share one rig: origin at the feet, ~1.6–2 units tall. Fixed framing
@@ -19,7 +21,7 @@ type FiniStageProps = {
 // bounds report the bind pose, which made Bounds zoom onto heads.
 const LOOK_AT: [number, number, number] = [0, 0.85, 0];
 
-export default function FiniStage({ tokenId, clip, interactive = true, timeScale = 1, mood }: FiniStageProps) {
+export default function FiniStage({ tokenId, clip, interactive = true, timeScale = 1, mood, compact = false }: FiniStageProps) {
   return (
     <Canvas
       camera={{ fov: 40, position: [0, 1.0, 4.2] }}
@@ -31,7 +33,7 @@ export default function FiniStage({ tokenId, clip, interactive = true, timeScale
       <directionalLight position={[3, 5, 4]} intensity={1.1} />
       <directionalLight position={[-4, 2, -3]} intensity={0.6} />
       <Suspense fallback={null}>
-        <FiniModel tokenId={tokenId} clip={clip} timeScale={timeScale} mood={mood} />
+        <FiniModel tokenId={tokenId} clip={clip} timeScale={timeScale} mood={mood} compact={compact} />
       </Suspense>
       {interactive && <OrbitControls makeDefault enablePan={false} enableZoom={false} target={LOOK_AT} />}
     </Canvas>

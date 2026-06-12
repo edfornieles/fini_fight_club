@@ -44,7 +44,7 @@ export function Fini3DPreview({ tokenId, fallback, interactive = true, mood }: {
         <ArenaErrorBoundary fallback={fallback} resetKey={tokenId}>
           <Suspense fallback={fallback ?? null}>
             <div style={{ position: "absolute", inset: 0 }}>
-              <FiniStage tokenId={tokenId} interactive={interactive} timeScale={mood ? MOOD_META[mood].timeScale : 1} mood={mood} />
+              <FiniStage tokenId={tokenId} interactive={interactive} timeScale={mood ? MOOD_META[mood].timeScale : 1} mood={mood} compact={!interactive} />
             </div>
           </Suspense>
         </ArenaErrorBoundary>
