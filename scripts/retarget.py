@@ -49,20 +49,34 @@ src_name_by_char = {c.name: s.name for c, s in pairs}
 sample_name = pairs[0][0].name
 sample_first = sample_last = None
 
+from mathutils import Matrix, Vector
 for cbone, _ in pairs:
     cbone.rotation_mode = "QUATERNION"
+cw_inv = char_arm.matrix_world.inverted()
+# Unit normalization: some eras are authored at a different world scale (the
+# gen2 set lands at ~1/100 → speck). Scale all transferred translations by the
+# ratio of rest heights.
+def world_height(arm):
+    zs = [(arm.matrix_world @ b.head_local).z for b in arm.data.bones]
+    zs += [(arm.matrix_world @ b.tail_local).z for b in arm.data.bones]
+    return max(zs) - min(zs) if zs else 1.0
+ratio = world_height(char_arm) / max(world_height(src_arm), 1e-9)
+print("HEIGHT_RATIO", round(ratio, 4))
 for frame in range(fmin, fmax + 1):
     sc.frame_set(frame)
     dg = bpy.context.evaluated_depsgraph_get()
     src_eval = src_arm.evaluated_get(dg)
-    # Copy LOCAL, rest-relative pose channels bone-for-bone. These are immune
-    # to the FBX import's object axis-rotation AND unit-scale (both of which
-    # corrupted the matrix-copy approaches). Works when the two rigs share bone
-    # rest orientations — which they do, same Fin_Bone_* convention.
+    sw = src_eval.matrix_world
+    # World-space transfer (Copy Transforms equivalent) with the source's
+    # object scale STRIPPED: decompose char-space target, rebuild with
+    # scale=1 so the FBX's unit factor can't crush/explode the skeleton.
     for cbone, _ in pairs:
         sb = src_eval.pose.bones[src_name_by_char[cbone.name]]
-        cbone.rotation_quaternion = sb.rotation_quaternion
-        cbone.location = sb.location
+        target = cw_inv @ sw @ sb.matrix
+        loc, rot, _scale = target.decompose()
+        cbone.matrix = Matrix.LocRotScale(loc * ratio, rot, Vector((1, 1, 1)))
+        bpy.context.view_layer.update()
+    for cbone, _ in pairs:
         cbone.keyframe_insert("rotation_quaternion", frame=frame)
         cbone.keyframe_insert("location", frame=frame)
 

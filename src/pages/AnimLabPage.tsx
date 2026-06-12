@@ -6,11 +6,12 @@ import { asset } from "../lib/assetUrl";
 const AnimLabStage = lazy(() => import("../components/three/AnimLabStage"));
 
 // Experimental clips bundled under public/anim/. { label, glb url, clip name }.
-// Converted with the SAME direct-export pipeline as the proven mood idles
-// (200 keyframes, 8.33s, source: Folder V2 gen1 shorts on Dropbox).
+// Retargeted onto the character armature (scripts/retarget.py: world-space
+// transfer, scale-stripped) and visually verified via headless Blender renders
+// (scripts/render_check.py) before landing here.
 const LAB_CLIPS: { label: string; url: string; clip: string }[] = [
-  { label: "mope (very sad)", url: asset("/anim/fin_mope.glb"),   clip: "fin_mope" },
-  { label: "dance (happy)",   url: asset("/anim/fin_dance2.glb"), clip: "fin_dance2" },
+  { label: "mope (very sad)", url: asset("/anim/fin_mope.glb"),  clip: "fin_mope" },
+  { label: "dance (happy)",   url: asset("/anim/fin_dance.glb"), clip: "fin_dance" },
 ];
 
 export function AnimLabPage() {
