@@ -31,8 +31,14 @@ function pickToken(family: string, seed: string, table: FamilyTokens): number | 
 
 const POS_LEFT: [number, number, number] = [-2.2, 0, 0];
 const POS_RIGHT: [number, number, number] = [2.2, 0, 0];
-const ROT_LEFT: [number, number, number] = [0, Math.PI / 2, 0];
-const ROT_RIGHT: [number, number, number] = [0, -Math.PI / 2, 0];
+// 3/4 hero stance, not pure profile. The Fini's face is a flat board on its
+// local +Z (it faces the camera at rotation 0 — see FiniModel). A full ±90°
+// turned it edge-on, and an attacker lunging inward showed its back. ~40° keeps
+// each fighter angled toward its opponent (the lunge + bow sell the face-off)
+// while the face stays toward the camera and clearly readable.
+const FACE_TURN = Math.PI * 0.22; // ≈ 40°
+const ROT_LEFT: [number, number, number] = [0, FACE_TURN, 0];
+const ROT_RIGHT: [number, number, number] = [0, -FACE_TURN, 0];
 // Attacker lunges a short jab toward the opponent (not all the way in).
 const LUNGE = 0.22;
 const lerp3 = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] =>
@@ -92,12 +98,16 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
   const winnerA = sideAPct >= sideBPct;
 
   // Per-fighter clip + lunge. While fighting: attacker swings + lunges, the
-  // other braces (defend). On resolve: winner cheers, loser is downed.
-  const aClip = resolved ? (winnerA ? FINI_STATE_CLIPS.winner : FINI_STATE_CLIPS.loser)
+  // other braces (defend). On resolve: winner celebrates, loser slumps — using
+  // the camera-facing MOOD clips (fin_dance / fin_mope) instead of the battle
+  // victory/defeat clips, which were authored facing away from the camera.
+  const WIN_CLIP = "fin_dance";   // happy celebration, faces camera (see FiniModel)
+  const LOSE_CLIP = "fin_mope";   // dejected, upright, faces camera
+  const aClip = resolved ? (winnerA ? WIN_CLIP : LOSE_CLIP)
     : attacker === "A" ? FINI_STATE_CLIPS.attack
     : attacker === "B" ? FINI_STATE_CLIPS.defend
     : FINI_STATE_CLIPS.idle;
-  const bClip = resolved ? (winnerA ? FINI_STATE_CLIPS.loser : FINI_STATE_CLIPS.winner)
+  const bClip = resolved ? (winnerA ? LOSE_CLIP : WIN_CLIP)
     : attacker === "B" ? FINI_STATE_CLIPS.attack
     : attacker === "A" ? FINI_STATE_CLIPS.defend
     : FINI_STATE_CLIPS.idle;

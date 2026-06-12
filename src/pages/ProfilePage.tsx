@@ -76,7 +76,8 @@ export function ProfilePage() {
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <h1 style={{ fontSize: 28, fontWeight: 900, color: "#111", margin: 0 }}>👤 Profile</h1>
           <div style={{ fontSize: 13, color: "#888", marginTop: 4, fontFamily: "monospace" }}>
-            {walletAddress.slice(0, 10)}...{walletAddress.slice(-4)} · joined {new Date(MOCK_STATS.joinedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            {walletAddress.slice(0, 10)}...{walletAddress.slice(-4)}
+            {stats.firstAt && <span> · first played {new Date(stats.firstAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>}
           </div>
         </div>
       </div>
@@ -152,7 +153,7 @@ export function ProfilePage() {
               <span style={{ fontSize: 20 }}>👛</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: "#111" }}>{walletAddress}</div>
-                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>Ethereum mainnet · {MOCK_STATS.finisOwned} Finis owned</div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>Ethereum mainnet</div>
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "#dcfce7", color: "#15803d" }}>✓ Connected</span>
             </div>
@@ -204,24 +205,26 @@ export function ProfilePage() {
                 <div style={{ height: "100%", width: `${winRatePct}%`, background: "linear-gradient(90deg, #22c55e, #16a34a)" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888", marginTop: 8 }}>
-                <span>Best streak</span><span style={{ fontWeight: 700, color: "#333" }}>{MOCK_STATS.bestStreak} wins</span>
+                <span>Best streak</span><span style={{ fontWeight: 700, color: "#333" }}>{stats.bestStreak} {stats.bestStreak === 1 ? "win" : "wins"}</span>
               </div>
             </div>
           </Card>
 
-          {/* Ranking */}
-          <Card title="🏅 Ranking" subtitle="Where you stand">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: "#111", lineHeight: 1 }}>#{MOCK_STATS.ranking}</div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>of {MOCK_STATS.totalPlayers.toLocaleString()} players</div>
+          {/* Net result — real, from settled bets */}
+          <Card title="📊 Net result" subtitle="Across settled battles">
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontSize: 34, fontWeight: 900, lineHeight: 1, color: stats.net > 0 ? "#16a34a" : stats.net < 0 ? "#dc2626" : "#111" }}>
+                {stats.net >= 0 ? "+" : ""}{stats.net.toLocaleString()}
+                <span style={{ fontSize: 15, color: "#854d0e", marginLeft: 6 }}>CUTE$</span>
               </div>
-              <Link to="/leaderboard" style={{ fontSize: 13, fontWeight: 700, color: "#f472b6", textDecoration: "none" }}>View leaderboard →</Link>
+              <Link to="/leaderboard" style={{ fontSize: 13, fontWeight: 700, color: "#f472b6", textDecoration: "none" }}>Leaderboard →</Link>
             </div>
-            <div style={{ height: 6, borderRadius: 100, background: "#e5e7eb", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${(1 - MOCK_STATS.ranking / MOCK_STATS.totalPlayers) * 100}%`, background: "linear-gradient(90deg, #f472b6, #ec4899)" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888" }}>
+              <span>Returned <b style={{ color: "#16a34a" }}>{stats.returned.toLocaleString()}</b></span>
+              <span>Staked <b style={{ color: "#dc2626" }}>{stats.staked.toLocaleString()}</b></span>
+              <span><b style={{ color: "#333" }}>{stats.played}</b> settled</span>
             </div>
-            <div style={{ fontSize: 11, color: "#bbb", marginTop: 6 }}>Top {Math.ceil((MOCK_STATS.ranking / MOCK_STATS.totalPlayers) * 100)}%</div>
+            {stats.open > 0 && <div style={{ fontSize: 11, color: "#bbb", marginTop: 8 }}>{stats.open} prediction{stats.open === 1 ? "" : "s"} still open (not counted)</div>}
           </Card>
 
           {/* Quick links */}

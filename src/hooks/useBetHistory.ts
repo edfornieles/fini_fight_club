@@ -31,9 +31,11 @@ export interface BetStats {
   staked: number;
   returned: number;
   net: number;      // returned - staked over settled
+  bestStreak: number; // longest run of consecutive wins (voids don't break it)
+  firstAt: string | null; // earliest prediction timestamp
 }
 
-const EMPTY: BetStats = { played: 0, won: 0, lost: 0, voided: 0, open: 0, winRatePct: 0, staked: 0, returned: 0, net: 0 };
+const EMPTY: BetStats = { played: 0, won: 0, lost: 0, voided: 0, open: 0, winRatePct: 0, staked: 0, returned: 0, net: 0, bestStreak: 0, firstAt: null };
 
 type RawRow = {
   id: number; battle_id: string; side: string; stake: number; payout: number | null;
@@ -82,10 +84,20 @@ export function useBetHistory(wallet: string | null | undefined) {
       const settled = mapped.filter((b) => b.outcome !== "open");
       const staked = settled.reduce((s, b) => s + b.stake, 0);
       const returned = settled.reduce((s, b) => s + (b.payout ?? 0), 0);
+      // Longest consecutive-win run, walked oldest→newest (mapped is newest-first).
+      // A void neither extends nor breaks the streak; a loss resets it.
+      let bestStreak = 0, cur = 0;
+      for (let i = mapped.length - 1; i >= 0; i--) {
+        const o = mapped[i].outcome;
+        if (o === "won") { cur++; if (cur > bestStreak) bestStreak = cur; }
+        else if (o === "lost") cur = 0;
+      }
       setStats({
         played: settled.length, won, lost, voided, open,
         winRatePct: won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0,
         staked, returned, net: returned - staked,
+        bestStreak,
+        firstAt: mapped.length ? mapped[mapped.length - 1].createdAt : null,
       });
       setBets(mapped);
       setLoading(false);
