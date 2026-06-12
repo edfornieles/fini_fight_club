@@ -6,9 +6,11 @@ import { asset } from "../lib/assetUrl";
 const AnimLabStage = lazy(() => import("../components/three/AnimLabStage"));
 
 // Experimental clips bundled under public/anim/. { label, glb url, clip name }.
+// Converted with the SAME direct-export pipeline as the proven mood idles
+// (200 keyframes, 8.33s, source: Folder V2 gen1 shorts on Dropbox).
 const LAB_CLIPS: { label: string; url: string; clip: string }[] = [
-  { label: "vomit (sad)",  url: asset("/anim/lab_vomit.glb"), clip: "fin_vomit" },
-  { label: "dance (happy)", url: asset("/anim/lab_dance.glb"), clip: "fin_dance" },
+  { label: "mope (very sad)", url: asset("/anim/fin_mope.glb"),   clip: "fin_mope" },
+  { label: "dance (happy)",   url: asset("/anim/fin_dance2.glb"), clip: "fin_dance2" },
 ];
 
 export function AnimLabPage() {
