@@ -5,72 +5,90 @@ import { asset } from "../lib/assetUrl";
 // clip here can only break THIS page — never the live mood system.
 const AnimLabStage = lazy(() => import("../components/three/AnimLabStage"));
 
-// Experimental clips bundled under public/anim/. { label, glb url, clip name }.
-// Retargeted onto the character armature (scripts/retarget.py: world-space
-// transfer, scale-stripped) and visually verified via headless Blender renders
-// (scripts/render_check.py) before landing here.
-const LAB_CLIPS: { label: string; url: string; clip: string }[] = [
-  { label: "mope (very sad)", url: asset("/anim/fin_mope.glb"),  clip: "fin_mope" },
-  { label: "dance (happy)",   url: asset("/anim/fin_dance.glb"), clip: "fin_dance" },
+// Verified clips (retargeted via scripts/retarget.py, render-checked headless).
+// Grouped by the mood tier they'd drive. { label, clip }.
+const GROUPS: { mood: string; clips: { label: string; clip: string }[] }[] = [
+  { mood: "😀 Happy / great", clips: [
+    { label: "dance", clip: "fin_dance" },
+    { label: "dancing w/ stars", clip: "fin_dancingwithstars" },
+    { label: "huge surprise", clip: "fin_hugesurprise" },
+  ]},
+  { mood: "😐 Neutral", clips: [
+    { label: "neutral idle", clip: "fin_neutral_idle" },
+    { label: "bored", clip: "fin_bored" },
+    { label: "hungry stomach", clip: "fin_hungrystomach" },
+  ]},
+  { mood: "🙁 Sad", clips: [
+    { label: "sad idle", clip: "fin_sad_idle" },
+    { label: "mope", clip: "fin_mope" },
+    { label: "angry", clip: "fin_angry" },
+    { label: "cough", clip: "fin_cough" },
+    { label: "distress sway", clip: "fin_distresssway" },
+  ]},
+  { mood: "🤢 Very sad / dying", clips: [
+    { label: "supersad idle", clip: "fin_supersad_idle" },
+    { label: "near dead", clip: "fin_neardead" },
+    { label: "rain crying", clip: "fin_raincrying" },
+    { label: "rain desperate", clip: "fin_raindesperate" },
+    { label: "rolling in rain", clip: "fin_rollingaroundtherain" },
+    { label: "banging head", clip: "fin_banginghead" },
+  ]},
 ];
+const ALL = GROUPS.flatMap(g => g.clips);
+const urlFor = (clip: string) => asset(`/anim/${clip.replace(/^fin_/, "fin_")}.glb`);
 
 export function AnimLabPage() {
   const [tokenInput, setTokenInput] = useState("4104");
   const [tokenId, setTokenId] = useState("4104");
-  const [sel, setSel] = useState(0);
-
-  const active = LAB_CLIPS[sel];
+  const [clip, setClip] = useState("fin_dance");
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", color: "#111" }}>
       <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Animation Lab</h1>
       <p style={{ marginTop: 4, color: "#555", fontSize: 13 }}>
-        Isolated retarget test. Loads one experimental clip on a chosen token —
-        no connection to Explore or Fight Club, so nothing here can break those.
+        {ALL.length} verified clips, grouped by the mood tier they'd drive. Isolated
+        from Explore / Fight Club. Pick a token, then a clip.
       </p>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "12px 0 16px" }}>
-        <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>Token ID</span>
-          <input
-            type="number" min={0} max={9999} value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: 6, width: 90 }}
-          />
-          <button
-            type="button"
-            onClick={() => setTokenId(String(Math.max(0, Math.min(9999, Number(tokenInput) || 0))))}
-            style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", cursor: "pointer" }}
-          >
-            Load
-          </button>
-        </label>
-
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          <span style={{ fontSize: 13, fontWeight: 600, marginRight: 4 }}>Clip</span>
-          {LAB_CLIPS.map((c, i) => (
-            <button
-              key={c.clip}
-              type="button"
-              onClick={() => setSel(i)}
-              style={{
-                padding: "6px 12px", borderRadius: 6, cursor: "pointer",
-                border: sel === i ? "1px solid #111" : "1px solid #ccc",
-                background: sel === i ? "#111" : "#fff",
-                color: sel === i ? "#fff" : "#333", fontWeight: 700, fontSize: 12,
-              }}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        <span style={{ fontSize: 12, color: "#777" }}>token #{tokenId} · {active.clip}</span>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "12px 0 12px" }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Token ID</span>
+        <input
+          type="number" min={0} max={9999} value={tokenInput}
+          onChange={(e) => setTokenInput(e.target.value)}
+          style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: 6, width: 90 }}
+        />
+        <button type="button"
+          onClick={() => setTokenId(String(Math.max(0, Math.min(9999, Number(tokenInput) || 0))))}
+          style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", cursor: "pointer" }}>
+          Load
+        </button>
+        <span style={{ fontSize: 12, color: "#777" }}>token #{tokenId} · {clip}</span>
       </div>
 
-      <div style={{ width: "100%", height: "70vh", background: "#0e0f12", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 14 }}>
+        {GROUPS.map(g => (
+          <div key={g.mood} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#444" }}>{g.mood}</span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 280 }}>
+              {g.clips.map(c => (
+                <button key={c.clip} type="button" onClick={() => setClip(c.clip)}
+                  style={{
+                    padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700,
+                    border: clip === c.clip ? "1px solid #111" : "1px solid #ccc",
+                    background: clip === c.clip ? "#111" : "#fff",
+                    color: clip === c.clip ? "#fff" : "#333",
+                  }}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ width: "100%", height: "62vh", background: "#0e0f12", borderRadius: 12, overflow: "hidden" }}>
         <Suspense fallback={<div style={{ padding: 16, color: "#bbb" }}>Loading 3D…</div>}>
-          <AnimLabStage tokenId={tokenId} clipUrl={active.url} clipName={active.clip} />
+          <AnimLabStage tokenId={tokenId} clipUrl={urlFor(clip)} clipName={clip} />
         </Suspense>
       </div>
     </div>
