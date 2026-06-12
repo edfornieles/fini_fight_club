@@ -1,14 +1,16 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, PerspectiveCamera } from "@react-three/drei";
 import { FiniFighter } from "./FiniFighter";
 import { asset } from "../../lib/assetUrl";
-import type { FiniLiveMood } from "../../lib/finiMood";
+import { FINI_STATE_CLIPS } from "../../lib/finiAssets";
 
 /**
  * The Crypto Arena duel: one Fini per competing coin, a randomly-drawn member
- * of that coin's family. They walk in, bow, then emote how their coin is doing
- * in this battle — the side that's ahead dances, the side that's behind mopes.
+ * of that coin's family. They walk in, bow, then FIGHT — trading lunging
+ * attacks (the side that's ahead presses the advantage and lands more) until
+ * the battle resolves, at which point the winner celebrates and the loser
+ * collapses.
  */
 
 type FamilyTokens = Record<string, number[]>;
@@ -27,31 +29,59 @@ function pickToken(family: string, seed: string, table: FamilyTokens): number | 
   return list[hash(seed + family) % list.length];
 }
 
-// Mood the fighter plays from its side's share of the pot (the live lead).
-function moodForPct(pct: number): FiniLiveMood {
-  if (pct >= 58) return "happy";
-  if (pct >= 45) return "neutral";
-  if (pct >= 30) return "sad";
-  return "sick";
-}
-
 const POS_LEFT: [number, number, number] = [-2.2, 0, 0];
 const POS_RIGHT: [number, number, number] = [2.2, 0, 0];
 const ROT_LEFT: [number, number, number] = [0, Math.PI / 2, 0];
 const ROT_RIGHT: [number, number, number] = [0, -Math.PI / 2, 0];
+// Attacker lunges ~45% of the way across the gap toward the opponent.
+const LUNGE = 0.45;
+const lerp3 = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] =>
+  [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAPct, sideBPct }: {
+const CEREMONY_MS = 3300;  // walk-in + bow before the first blow
+const SWING_MS = 1100;     // cadence of attacks
+
+export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAPct, sideBPct, resolved = false }: {
   battleId: string;
   familyA: string;
   familyB?: string;
   sideAPct: number;
   sideBPct: number;
+  /** When true the duel stops and freezes to the outcome (winner / loser). */
+  resolved?: boolean;
 }) {
   const [table, setTable] = useState<FamilyTokens | null>(_cache);
+  // Whose turn to strike: "A", "B", or null (between swings / pre-fight).
+  const [attacker, setAttacker] = useState<"A" | "B" | null>(null);
+  const fighting = useRef(false);
+  const pctRef = useRef({ a: sideAPct, b: sideBPct });
+  pctRef.current = { a: sideAPct, b: sideBPct };
+
   useEffect(() => {
-    if (_cache) return;
+    if (_cache) { setTable(_cache); return; }
     fetch(asset("/data/familyTokens.json")).then(r => r.json()).then((t: FamilyTokens) => { _cache = t; setTable(t); }).catch(() => {});
   }, []);
+
+  // Fight loop: after the ceremony, alternate strikes — the leading side
+  // attacks more often (presses its advantage). Stops once resolved.
+  useEffect(() => {
+    if (!table || resolved) { setAttacker(null); fighting.current = false; return; }
+    let alive = true;
+    let swing: ReturnType<typeof setTimeout>;
+    let clear: ReturnType<typeof setTimeout>;
+    const start = setTimeout(() => { fighting.current = true; tick(); }, CEREMONY_MS);
+
+    function tick() {
+      if (!alive) return;
+      const { a, b } = pctRef.current;
+      const total = a + b || 1;
+      const next: "A" | "B" = Math.random() < a / total ? "A" : "B";
+      setAttacker(next);
+      clear = setTimeout(() => alive && setAttacker(null), SWING_MS * 0.55);
+      swing = setTimeout(tick, SWING_MS);
+    }
+    return () => { alive = false; clearTimeout(start); clearTimeout(swing); clearTimeout(clear); };
+  }, [table, resolved]);
 
   if (!table) return null;
   const tokenA = pickToken(familyA, battleId, table);
@@ -59,8 +89,20 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
   const tokenB = familyB ? pickToken(familyB, battleId, table) : pickToken(familyA, battleId + "b", table);
   if (tokenA == null || tokenB == null) return null;
 
-  const moodA = moodForPct(sideAPct);
-  const moodB = moodForPct(sideBPct);
+  const winnerA = sideAPct >= sideBPct;
+
+  // Per-fighter clip + lunge. While fighting: attacker swings + lunges, the
+  // other braces (defend). On resolve: winner cheers, loser is downed.
+  const aClip = resolved ? (winnerA ? FINI_STATE_CLIPS.winner : FINI_STATE_CLIPS.loser)
+    : attacker === "A" ? FINI_STATE_CLIPS.attack
+    : attacker === "B" ? FINI_STATE_CLIPS.defend
+    : FINI_STATE_CLIPS.idle;
+  const bClip = resolved ? (winnerA ? FINI_STATE_CLIPS.loser : FINI_STATE_CLIPS.winner)
+    : attacker === "B" ? FINI_STATE_CLIPS.attack
+    : attacker === "A" ? FINI_STATE_CLIPS.defend
+    : FINI_STATE_CLIPS.idle;
+  const aLunge = !resolved && attacker === "A" ? lerp3(POS_LEFT, POS_RIGHT, LUNGE) : null;
+  const bLunge = !resolved && attacker === "B" ? lerp3(POS_RIGHT, POS_LEFT, LUNGE) : null;
 
   return (
     <Canvas shadows dpr={[1, 2]} style={{ width: "100%", height: "100%" }} gl={{ alpha: true }}>
@@ -78,7 +120,9 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
           homePosition={POS_LEFT}
           rotation={ROT_LEFT}
           scale={1.5}
-          mood={moodA}
+          clip={aClip}
+          lungeTo={aLunge}
+          ko={resolved && !winnerA}
           intro={{ fromX: -9, delayMs: 0 }}
         />
         <FiniFighter
@@ -87,7 +131,9 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
           homePosition={POS_RIGHT}
           rotation={ROT_RIGHT}
           scale={1.5}
-          mood={moodB}
+          clip={bClip}
+          lungeTo={bLunge}
+          ko={resolved && winnerA}
           intro={{ fromX: 9, delayMs: 200 }}
         />
       </Suspense>

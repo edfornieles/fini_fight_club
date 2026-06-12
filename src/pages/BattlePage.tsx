@@ -778,6 +778,7 @@ function BattleArenaHero({
               familyB={battle.familyB ?? battle.assets[1]}
               sideAPct={sideAPct}
               sideBPct={sideBPct}
+              resolved={remaining <= 0 || resolutionStatus === "resolved" || resolutionStatus === "voided"}
             />
           </Suspense>
         </div>
