@@ -33,8 +33,8 @@ const POS_LEFT: [number, number, number] = [-2.2, 0, 0];
 const POS_RIGHT: [number, number, number] = [2.2, 0, 0];
 const ROT_LEFT: [number, number, number] = [0, Math.PI / 2, 0];
 const ROT_RIGHT: [number, number, number] = [0, -Math.PI / 2, 0];
-// Attacker lunges ~45% of the way across the gap toward the opponent.
-const LUNGE = 0.45;
+// Attacker lunges a short jab toward the opponent (not all the way in).
+const LUNGE = 0.22;
 const lerp3 = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] =>
   [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
