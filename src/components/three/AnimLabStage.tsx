@@ -5,6 +5,8 @@ import { Group } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { finiModelUrl } from "../../lib/finiAssets";
+import { applyMoodFace } from "../../lib/finiFaceMood";
+import type { FiniLiveMood } from "../../lib/finiMood";
 
 const LOOK_AT: [number, number, number] = [0, 0.85, 0];
 
@@ -13,12 +15,16 @@ const LOOK_AT: [number, number, number] = [0, 0.85, 0];
  * one character + one experimental clip GLB and plays it. The whole point is
  * that a broken clip is contained here.
  */
-function LabModel({ tokenId, clipUrl, clipName }: { tokenId: string; clipUrl: string; clipName: string }) {
+function LabModel({ tokenId, clipUrl, clipName, mood }: { tokenId: string; clipUrl: string; clipName: string; mood: FiniLiveMood }) {
   const groupRef = useRef<Group>(null);
   const char = useGLTF(finiModelUrl(tokenId), true);
   const extra = useGLTF(clipUrl);
 
   const sceneClone = useMemo(() => SkeletonUtils.clone(char.scene), [char.scene]);
+
+  // Coordinate the face with the body: a moping Fini gets a sad mouth, etc.
+  useEffect(() => { applyMoodFace(sceneClone, mood); }, [sceneClone, mood]);
+
   const clips = useMemo(
     () => [...char.animations, ...extra.animations],
     [char.animations, extra.animations],
@@ -41,7 +47,7 @@ function LabModel({ tokenId, clipUrl, clipName }: { tokenId: string; clipUrl: st
   );
 }
 
-export default function AnimLabStage({ tokenId, clipUrl, clipName }: { tokenId: string; clipUrl: string; clipName: string }) {
+export default function AnimLabStage({ tokenId, clipUrl, clipName, mood }: { tokenId: string; clipUrl: string; clipName: string; mood: FiniLiveMood }) {
   return (
     <Canvas camera={{ fov: 40, position: [0, 1.0, 4.2] }} dpr={[1, 1.5]} style={{ width: "100%", height: "100%" }}
       onCreated={({ camera }) => camera.lookAt(...LOOK_AT)}>
@@ -51,7 +57,7 @@ export default function AnimLabStage({ tokenId, clipUrl, clipName }: { tokenId: 
       <Suspense fallback={null}>
         {/* key remounts the whole rig when token or clip changes, so no stale
             mixer state leaks between experiments. */}
-        <LabModel key={`${tokenId}:${clipName}`} tokenId={tokenId} clipUrl={clipUrl} clipName={clipName} />
+        <LabModel key={`${tokenId}:${clipName}`} tokenId={tokenId} clipUrl={clipUrl} clipName={clipName} mood={mood} />
       </Suspense>
       <OrbitControls makeDefault enablePan={false} enableZoom target={LOOK_AT} />
     </Canvas>

@@ -1,31 +1,33 @@
 import { lazy, Suspense, useState } from "react";
 import { asset } from "../lib/assetUrl";
+import type { FiniLiveMood } from "../lib/finiMood";
 
 // Fully isolated from FiniModel / FiniStage / Explore. A broken experimental
 // clip here can only break THIS page — never the live mood system.
 const AnimLabStage = lazy(() => import("../components/three/AnimLabStage"));
 
-// Verified clips (retargeted via scripts/retarget.py, render-checked headless).
-// Grouped by the mood tier they'd drive. { label, clip }.
-const GROUPS: { mood: string; clips: { label: string; clip: string }[] }[] = [
-  { mood: "😀 Happy / great", clips: [
+// Verified clips, grouped by the mood tier they'd drive. `face` is the mouth
+// the texture gets (the body clip + face stay coordinated — a moping Fini
+// also gets a sad mouth).
+const GROUPS: { mood: string; face: FiniLiveMood; clips: { label: string; clip: string }[] }[] = [
+  { mood: "😀 Happy / great", face: "happy", clips: [
     { label: "dance", clip: "fin_dance" },
     { label: "dancing w/ stars", clip: "fin_dancingwithstars" },
     { label: "huge surprise", clip: "fin_hugesurprise" },
   ]},
-  { mood: "😐 Neutral", clips: [
+  { mood: "😐 Neutral", face: "neutral", clips: [
     { label: "neutral idle", clip: "fin_neutral_idle" },
     { label: "bored", clip: "fin_bored" },
     { label: "hungry stomach", clip: "fin_hungrystomach" },
   ]},
-  { mood: "🙁 Sad", clips: [
+  { mood: "🙁 Sad", face: "sad", clips: [
     { label: "sad idle", clip: "fin_sad_idle" },
     { label: "mope", clip: "fin_mope" },
     { label: "angry", clip: "fin_angry" },
     { label: "cough", clip: "fin_cough" },
     { label: "distress sway", clip: "fin_distresssway" },
   ]},
-  { mood: "🤢 Very sad / dying", clips: [
+  { mood: "🤢 Very sad / dying", face: "sick", clips: [
     { label: "supersad idle", clip: "fin_supersad_idle" },
     { label: "near dead", clip: "fin_neardead" },
     { label: "rain crying", clip: "fin_raincrying" },
@@ -35,12 +37,14 @@ const GROUPS: { mood: string; clips: { label: string; clip: string }[] }[] = [
   ]},
 ];
 const ALL = GROUPS.flatMap(g => g.clips);
-const urlFor = (clip: string) => asset(`/anim/${clip.replace(/^fin_/, "fin_")}.glb`);
+const FACE_OF = new Map(GROUPS.flatMap(g => g.clips.map(c => [c.clip, g.face] as const)));
+const urlFor = (clip: string) => asset(`/anim/${clip}.glb`);
 
 export function AnimLabPage() {
   const [tokenInput, setTokenInput] = useState("4104");
   const [tokenId, setTokenId] = useState("4104");
   const [clip, setClip] = useState("fin_dance");
+  const mood: FiniLiveMood = FACE_OF.get(clip) ?? "happy";
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui, sans-serif", color: "#111" }}>
@@ -88,7 +92,7 @@ export function AnimLabPage() {
 
       <div style={{ width: "100%", height: "62vh", background: "#0e0f12", borderRadius: 12, overflow: "hidden" }}>
         <Suspense fallback={<div style={{ padding: 16, color: "#bbb" }}>Loading 3D…</div>}>
-          <AnimLabStage tokenId={tokenId} clipUrl={urlFor(clip)} clipName={clip} />
+          <AnimLabStage tokenId={tokenId} clipUrl={urlFor(clip)} clipName={clip} mood={mood} />
         </Suspense>
       </div>
     </div>
