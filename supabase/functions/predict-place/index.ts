@@ -55,18 +55,27 @@ Deno.serve(async (req) => {
 
   // 1b. Lock the odds SERVER-SIDE from the live pool. Fixed-odds settlement
   //     pays stake × 100/locked_pct, so this value is money — the client's
-  //     copy is ignored (a forged lockedPct:1 would otherwise pay 100×).
-  //     Same 5..95 band the arena displays; empty pool opens at 50/50.
+  //     copy is ignored (a forged lockedPct would otherwise dictate the payout).
+  //     Empty pool opens at 50/50; band clamped to 10..90 so the max multiplier
+  //     is 10× (bounds the house's minted exposure on a thin pool).
   const { data: poolRows } = await sb.from("predictions")
-    .select("side, stake").eq("battle_id", battleId).eq("status", "open");
+    .select("side, stake, wallet_address").eq("battle_id", battleId).eq("status", "open");
   let poolA = 0, poolB = 0;
+  const mySides = new Set<string>();
   for (const p of poolRows ?? []) {
     if (p.side === "A") poolA += Number(p.stake) || 0; else poolB += Number(p.stake) || 0;
+    if (p.wallet_address === wallet) mySides.add(p.side);
+  }
+  // No wash-betting / self-seeding: a wallet may hold only ONE side of a battle.
+  // (Betting both sides off a thin pool was the fixed-odds self-seed exploit —
+  // stake A at 50%, then B at the floor for a guaranteed high multiplier.)
+  if (mySides.has(side === "A" ? "B" : "A")) {
+    return jsonResponse({ error: "already_on_other_side" }, 409);
   }
   const poolTotal = poolA + poolB;
   const sidePool = side === "A" ? poolA : poolB;
   const lockedPct = poolTotal > 0
-    ? Math.min(95, Math.max(5, Math.round((sidePool / poolTotal) * 100)))
+    ? Math.min(90, Math.max(10, Math.round((sidePool / poolTotal) * 100)))
     : 50;
 
   // 2. Debit stake atomically

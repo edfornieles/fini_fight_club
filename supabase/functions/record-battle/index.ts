@@ -54,22 +54,18 @@ Deno.serve(async (req) => {
 
   const sb = supabaseAdmin();
 
-  // 1. Debit the stake (idempotent — same battleId always same key)
-  if (stake > 0) {
-    const { error: debitErr } = await sb.rpc("debit_balance", {
-      p_wallet:          wallet,
-      p_amount:          stake,
-      p_reason:          "battle_entry",
-      p_idempotency_key: `battle:${battleId}:entry`,
-      p_battle_id:       battleId,
-    });
-    if (debitErr) {
-      if (debitErr.message.includes("insufficient_funds")) return jsonResponse({ error: "insufficient_funds" }, 402);
-      return jsonResponse({ error: debitErr.message }, 500);
-    }
-  }
+  // ── SECURITY: Fight Club CUTE$ economy is DISABLED here ────────────────────
+  // The outcome is computed CLIENT-SIDE (PvE in the browser) and posted up. With
+  // no server-side resolution we cannot trust it, and crediting a client-claimed
+  // "win" lets anyone mint CUTE$ unbounded (fresh battleId each call → +stake
+  // every time). So record-battle is RECORD-ONLY: it updates Fini win/loss stats
+  // and writes the audit log, but performs NO balance debit or credit. CUTE$
+  // wagering in Fight Club stays off until the fight is resolved server-side
+  // (re-derive the outcome from teamTokenIds + opponentSeed, or match PvP pairs
+  // atomically) — then re-enable the debit/credit below.
+  const ECONOMY_ENABLED = false;
 
-  // 2. Apply per-Fini stat changes
+  // Apply per-Fini stat changes (wins/losses/XP) — not economic, safe to trust.
   const outcomes = teamTokenIds.map(id => ({ token_id: id, outcome }));
   const { error: recordErr } = await sb.rpc("record_battle_outcome", {
     p_contract_address: FINILIAR_CONTRACT,
@@ -77,34 +73,21 @@ Deno.serve(async (req) => {
   });
   if (recordErr) return jsonResponse({ error: "record_failed: " + recordErr.message }, 500);
 
-  // 3. Credit the payout
-  let newBalance: number | undefined;
-  if (payout > 0) {
-    const { data: credit, error: creditErr } = await sb.rpc("credit_balance", {
-      p_wallet:          wallet,
-      p_amount:          payout,
-      p_reason:          outcome === "draw" ? "battle_refund" : "battle_payout",
-      p_idempotency_key: `battle:${battleId}:payout`,
-      p_battle_id:       battleId,
-    });
-    if (creditErr) return jsonResponse({ error: "payout_failed: " + creditErr.message }, 500);
-    newBalance = credit?.[0]?.new_balance;
-  } else {
-    const { data: bal } = await sb.from("fini_balances").select("balance").eq("wallet_address", wallet).maybeSingle();
-    newBalance = bal?.balance;
-  }
+  // Current balance (unchanged — no debit/credit applied).
+  const { data: bal } = await sb.from("fini_balances").select("balance").eq("wallet_address", wallet).maybeSingle();
+  const newBalance = bal?.balance;
 
-  // 4. Audit log
+  // Audit log — record the claimed result, but flag that no CUTE$ moved.
   await sb.from("battles_log").insert({
     battle_id:       battleId,
     battle_type:     battleType,
     team_wallet:     wallet,
     team_token_ids:  teamTokenIds,
     outcome,
-    stake,
-    payout,
-    metadata:        { opponentSeed: body.opponentSeed },
+    stake:           0,
+    payout:          0,
+    metadata:        { opponentSeed: body.opponentSeed, claimedStake: stake, claimedPayout: payout, economyApplied: ECONOMY_ENABLED },
   });
 
-  return jsonResponse({ success: true, outcome, payout, newBalance });
+  return jsonResponse({ success: true, outcome, payout: 0, newBalance, economyApplied: ECONOMY_ENABLED });
 });
