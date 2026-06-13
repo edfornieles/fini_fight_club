@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, PerspectiveCamera } from "@react-three/drei";
 import { FiniFighter } from "./FiniFighter";
+import { ForestEnvironment } from "./ForestEnvironment";
 import { asset } from "../../lib/assetUrl";
 import { FINI_STATE_CLIPS } from "../../lib/finiAssets";
 
@@ -119,10 +120,14 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
       {/* Pulled back + tilted down a touch so both full bodies (feet to head)
           read in a wide hero. */}
       <PerspectiveCamera makeDefault fov={38} position={[0, 1.9, 9.5]} onUpdate={c => c.lookAt(0, 1.0, 0)} />
-      <ambientLight intensity={0.65} />
+      {/* Forest HDRI adds soft fill — drop ambient so the Finis don't wash out. */}
+      <ambientLight intensity={0.35} />
       <directionalLight position={[6, 12, 6]} intensity={1} castShadow />
       <directionalLight position={[-6, 5, -4]} intensity={0.35} />
-      <ContactShadows position={[0, 0.01, 0]} opacity={0.45} scale={20} blur={2.4} far={5} />
+      <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={20} blur={2.4} far={5} />
+      <Suspense fallback={null}>
+        <ForestEnvironment />
+      </Suspense>
       <Suspense fallback={null}>
         <FiniFighter
           key={`a-${tokenA}`}
