@@ -278,3 +278,8 @@ body::before {
     animation: none;
   }
 }
+
+/* Crypto Arena tile face-off — two Finis lunge in and clash (no WebGL). */
+@keyframes tileSparL { 0%, 100% { transform: translateX(0) rotate(-5deg); } 50% { transform: translateX(7px) rotate(3deg); } }
+@keyframes tileSparR { 0%, 100% { transform: translateX(0) rotate(5deg); } 50% { transform: translateX(-7px) rotate(-3deg); } }
+@keyframes tileClash { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; } 50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; } }

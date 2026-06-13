@@ -248,7 +248,6 @@ export function BattlePage() {
   const primaryAsset = battle.assets[0];
   const color = ASSET_COLORS[primaryAsset] ?? "#f472b6";
   const meta = ASSET_META[primaryAsset];
-  const fee = Math.round(Number(stake) * 0.07 * (sideA.pct / 100) * (sideB.pct / 100));
 
   const endsAt = battleEndsAtMs(battle.id, battle.endsInMs);
   const playerSettled = playerEntry && playerEntry.status !== "open";
@@ -437,7 +436,7 @@ export function BattlePage() {
               <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7, fontWeight: 500 }}>
                 <b>Price source.</b> Every price is the median of three feeds — CoinGecko, Coinbase, and Binance — so no single source can skew a result.<br />
                 <b>Winner.</b> Decided purely by the price move over the window (see the rule at the top of this page). If the feeds disagree or fail at close, the battle is voided and every stake is refunded — never guessed.<br />
-                <b>Payout.</b> Your odds lock the moment you enter: win and you're paid stake × 100 ÷ your side's % at entry — back a 40% underdog for 2.5×, a 70% favourite for ~1.4×. The "To win" figure shown when you bet is exactly what a win pays.<br />
+                <b>Payout.</b> Winners split the whole prize pool in proportion to their stake — so backing the underdog pays more and the favourite pays less. The "Est. payout" updates with the live odds and finalises from the pool when the battle closes.<br />
                 {!isOnline && <><b>Sell anytime.</b> You can cash out a position before the battle ends at its current market value, to lock in a gain or cut a loss.<br /></>}
                 <b>Play-money beta.</b> CUTE$ is an in-game currency with no real-world value. Prices may be delayed; this is a game, not a trading tool.
               </div>
@@ -527,11 +526,11 @@ export function BattlePage() {
               }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 800, color: "#666", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    To win
+                    Est. payout
                   </div>
                   <div style={{ fontSize: 10, color: "#999", marginTop: 2, fontWeight: 700 }}>
                     {selectedSide
-                      ? `at ${selectedSide === "A" ? sideA.pct : sideB.pct}¢ / share · fee ~${fee} CUTE$`
+                      ? `~${selectedSide === "A" ? sideA.pct : sideB.pct}¢ / share · final depends on the pool at close`
                       : "Pick a side to see your payout"}
                   </div>
                 </div>

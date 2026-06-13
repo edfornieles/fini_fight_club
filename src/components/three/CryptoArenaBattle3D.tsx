@@ -48,7 +48,7 @@ const lerp3 = (a: [number, number, number], b: [number, number, number], t: numb
 const CEREMONY_MS = 3300;  // walk-in + bow before the first blow
 const SWING_MS = 1100;     // cadence of attacks
 
-export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAPct, sideBPct, resolved = false }: {
+export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAPct, sideBPct, resolved = false, compact = false }: {
   battleId: string;
   familyA: string;
   familyB?: string;
@@ -56,6 +56,8 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
   sideBPct: number;
   /** When true the duel stops and freezes to the outcome (winner / loser). */
   resolved?: boolean;
+  /** Tile preview: skip the heavy forest HDRI, transparent background. */
+  compact?: boolean;
 }) {
   const [table, setTable] = useState<FamilyTokens | null>(_cache);
   // Whose turn to strike: "A", "B", or null (between swings / pre-fight).
@@ -125,9 +127,11 @@ export default function CryptoArenaBattle3D({ battleId, familyA, familyB, sideAP
       <directionalLight position={[6, 12, 6]} intensity={1} castShadow />
       <directionalLight position={[-6, 5, -4]} intensity={0.35} />
       <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={20} blur={2.4} far={5} />
-      <Suspense fallback={null}>
-        <ForestEnvironment />
-      </Suspense>
+      {!compact && (
+        <Suspense fallback={null}>
+          <ForestEnvironment />
+        </Suspense>
+      )}
       <Suspense fallback={null}>
         <FiniFighter
           key={`a-${tokenA}`}

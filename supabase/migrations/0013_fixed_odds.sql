@@ -1,18 +1,16 @@
--- ── Fixed-odds (Polymarket-style) settlement ────────────────────────────────
--- Replaces the parimutuel payout in resolve_battle with FIXED ODDS LOCKED AT
--- ENTRY: a winner is paid stake × 100/locked_pct — exactly the "To win" figure
--- the bet panel shows when the prediction is placed. Backing a 40% underdog
--- locks 2.5×; a 70% favourite locks ~1.43×. The implied probability (locked_pct)
--- reflects the live pool balance at entry, so odds still move with other
--- people's bets — but each player's payout is certain the moment they bet,
--- rather than floating with the final pool.
+-- ── resolve_battle: PARIMUTUEL settlement (self-funding) ────────────────────
+-- DESIGN DECISION (2026-06-13): the arena pays PARIMUTUEL, not fixed-odds.
+-- Fixed-odds priced off the instantaneous pool let the house MINT a shortfall,
+-- which a both-side / thin-pool self-seed could farm risk-free (audit CRITICAL
+-- #2). Parimutuel is self-funding — winners split exactly the pool the losers
+-- staked, so the house can never be drained and there is nothing to seed. With
+-- deep two-sided bot liquidity the odds barely move on a single bet, so it still
+-- reads as locked/Polymarket-like; the bet panel shows the payout as an estimate.
 --
--- The house (play-money ledger) covers any net between paid winnings and the
--- pool; for the non-cash beta this is just minting via credit_balance. The
--- return json reports house P&L per battle for the operator economy view.
---
--- Void path is unchanged (all stakes refunded). Idempotent (already-resolved
--- battles no-op).
+-- This migration re-asserts the parimutuel resolve_battle (same behaviour as the
+-- live 0005 version) and adds paid_out / house_pl to the return for the operator
+-- economy view. Safe to deploy: it does not change live settlement behaviour.
+-- Void path unchanged (all stakes refunded). Idempotent.
 
 set search_path = public;
 
@@ -34,6 +32,7 @@ declare
   v_predictions      record;
   v_total_pool       bigint := 0;
   v_winning_pool     bigint := 0;
+  v_payout_per_unit  numeric := 0;
   v_paid_out         bigint := 0;
   v_payout           bigint;
   v_idem             text;
@@ -62,8 +61,7 @@ begin
         v_predictions.wallet_address, v_predictions.stake, 'prediction_refund',
         v_idem, p_battle_id, null, null, '{}'::jsonb
       );
-      update public.predictions
-         set status = 'voided', payout = v_predictions.stake
+      update public.predictions set status = 'voided', payout = v_predictions.stake
        where id = v_predictions.id;
     end loop;
     update public.battle_instances set
@@ -76,15 +74,17 @@ begin
     return json_build_object('voided', true);
   end if;
 
-  -- ── Fixed-odds payout: winners get stake × 100 / locked_pct ────────────────
+  -- ── Parimutuel payout: winners split the whole pool pro-rata to their stake.
+  if v_winning_pool > 0 then
+    v_payout_per_unit := (v_total_pool::numeric) / (v_winning_pool::numeric);
+  end if;
+
   for v_predictions in
-    select id, wallet_address, stake, side, locked_pct from public.predictions
+    select id, wallet_address, stake, side from public.predictions
      where battle_id = p_battle_id and status = 'open'
   loop
     if v_predictions.side = p_winning_side then
-      -- locked_pct is the implied probability at entry (1..99); guard nulls/0.
-      v_payout := floor(v_predictions.stake::numeric * 100.0
-                        / greatest(coalesce(v_predictions.locked_pct, 50), 1))::bigint;
+      v_payout := floor(v_predictions.stake * v_payout_per_unit)::bigint;
       v_paid_out := v_paid_out + v_payout;
       v_idem := 'predict:payout:' || v_predictions.id::text;
       perform public.credit_balance(
@@ -106,12 +106,9 @@ begin
   where id = p_battle_id;
 
   return json_build_object(
-    'resolved', true,
-    'winning_side', p_winning_side,
-    'total_pool', v_total_pool,
-    'winning_pool', v_winning_pool,
-    'paid_out', v_paid_out,
-    'house_pl', v_total_pool - v_paid_out   -- positive = house kept; negative = house topped up
+    'resolved', true, 'winning_side', p_winning_side,
+    'total_pool', v_total_pool, 'winning_pool', v_winning_pool,
+    'paid_out', v_paid_out, 'house_pl', v_total_pool - v_paid_out  -- ~0 dust; parimutuel self-funds
   );
 end;
 $$;

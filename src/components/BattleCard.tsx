@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Battle } from "../data/mockBattles";
 import { battleEndsAtMs } from "../data/cryptoSim";
 import { getCachedPrices } from "../lib/priceProviders";
 import { priceSeries } from "../lib/velocity";
 import { seedHistoryFor } from "../lib/historicalPrices";
+import { ArenaErrorBoundary } from "./three/ArenaErrorBoundary";
+
+// Loaded only when a card is hovered, so the arena 3D never weighs on the grid.
+const CryptoArenaBattle3D = lazy(() => import("./three/CryptoArenaBattle3D"));
 
 export type { BattleStatus, BattleType, Battle } from "../data/mockBattles";
 
@@ -104,34 +108,46 @@ export function BattleCard({ battle }: { battle: Battle }) {
   const phase: "live" | "ended" = msToEnd > 0 ? "live" : "ended";
   const remaining = msToEnd;
 
+  const [hover, setHover] = useState(false);
+  const famA = battle.familyA ?? battle.assets[0];
+  const famB = battle.familyB ?? battle.assets[1]; // undefined for up/down (same family fields two)
+
   return (
     <div onClick={() => navigate(`/battle/${battle.id}`)} style={{
       fontFamily: "'Nunito', system-ui, sans-serif",
       background: "#fff", borderRadius: 20, border: "1.5px solid #f0f0f0",
-      boxShadow: "0 2px 12px rgba(0,0,0,0.06)", cursor: "pointer", overflow: "hidden",
+      boxShadow: hover ? "0 8px 24px rgba(0,0,0,0.10)" : "0 2px 12px rgba(0,0,0,0.06)",
+      cursor: "pointer", overflow: "hidden",
       display: "flex", flexDirection: "column",
+      transform: hover ? "translateY(-2px)" : "",
       transition: "transform 0.15s, box-shadow 0.15s",
     }}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.10)"; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ""; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)"; }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
     >
-      {/* Thumbnail strip */}
-      <div style={{ height: 68, background: "#fce8e8", display: "flex", overflow: "hidden", position: "relative" }}>
-        <div style={{ flex: 1, background: ASSET_COLORS[battle.assets[0]] + "22", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <FiniGlyph family={battle.assets[0]} size={42} />
-        </div>
-        {battle.assets[1] && (
-          <>
-            <div style={{ width: 2, background: "#fff", zIndex: 1 }} />
-            <div style={{ flex: 1, background: ASSET_COLORS[battle.assets[1]] + "22", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FiniGlyph family={battle.assets[1]} size={42} />
-            </div>
-          </>
+      {/* Thumbnail strip — two Finis squaring off; springs to a live 3D duel on hover. */}
+      <div style={{ height: hover ? 170 : 68, background: "#fce8e8", overflow: "hidden", position: "relative", transition: "height 0.22s ease" }}>
+        {hover ? (
+          <Suspense fallback={<FaceOff famA={famA} famB={famB ?? famA} />}>
+            <ArenaErrorBoundary>
+              <CryptoArenaBattle3D
+                battleId={battle.id}
+                familyA={famA}
+                familyB={famB}
+                sideAPct={sideA.pct}
+                sideBPct={sideB.pct}
+                resolved={phase === "ended"}
+                compact
+              />
+            </ArenaErrorBoundary>
+          </Suspense>
+        ) : (
+          <FaceOff famA={famA} famB={famB ?? famA} />
         )}
-        <div style={{ position: "absolute", top: 8, left: 8 }}>
+        <div style={{ position: "absolute", top: 8, left: 8, zIndex: 3 }}>
           <StatusChip status={phase === "live" ? "live" : battle.status} endsInMs={remaining} />
         </div>
-        <div style={{ position: "absolute", top: 8, right: 8, fontSize: 10, fontWeight: 700, color: "#aaa", background: "rgba(255,255,255,0.85)", padding: "2px 7px", borderRadius: 6 }}>
+        <div style={{ position: "absolute", top: 8, right: 8, zIndex: 3, fontSize: 10, fontWeight: 700, color: "#aaa", background: "rgba(255,255,255,0.85)", padding: "2px 7px", borderRadius: 6 }}>
           {battle.durationLabel}
         </div>
       </div>
@@ -217,6 +233,23 @@ export function BattleCard({ battle }: { battle: Battle }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Static two-Fini face-off shown on every tile — they lunge in and clash. */
+function FaceOff({ famA, famB }: { famA: string; famB: string }) {
+  return (
+    <>
+      <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+        <div style={{ flex: 1, background: ASSET_COLORS[famA] + "22", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 12 }}>
+          <div style={{ animation: "tileSparL 1.5s ease-in-out infinite" }}><FiniGlyph family={famA} size={42} /></div>
+        </div>
+        <div style={{ flex: 1, background: ASSET_COLORS[famB] + "22", display: "flex", alignItems: "center", justifyContent: "flex-start", paddingLeft: 12 }}>
+          <div style={{ animation: "tileSparR 1.5s ease-in-out infinite" }}><FiniGlyph family={famB} size={42} /></div>
+        </div>
+      </div>
+      <div style={{ position: "absolute", left: "50%", top: "50%", zIndex: 2, fontSize: 15, animation: "tileClash 1.5s ease-in-out infinite", pointerEvents: "none" }}>⚔️</div>
+    </>
   );
 }
 
